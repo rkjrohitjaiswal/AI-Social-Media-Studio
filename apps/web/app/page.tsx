@@ -40,6 +40,21 @@ export default function PublicHomepage() {
     "command-center" | "image-studio" | "video-studio" | "media-editor" | "calendar" | "analytics"
   >("command-center");
 
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const scrollToSectionMobile = (id: string) => {
+    setMobileMenuOpen(false);
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   const workflowSteps = [
     { step: "01", name: "IDEA", desc: "Brainstorm topics & content pillars", icon: Target },
     { step: "02", name: "CREATE", desc: "Generate text, images, videos & scripts", icon: Sparkles },
@@ -158,21 +173,41 @@ export default function PublicHomepage() {
 
           {/* CENTER: NAV LINKS */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#9e9d98]">
-            <a href="#features" className="hover:text-[#f5f4f0] transition-colors">
+            <button
+              type="button"
+              onClick={() => scrollToSection("features")}
+              className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+            >
               Product
-            </a>
-            <a href="#capabilities" className="hover:text-[#f5f4f0] transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("capabilities")}
+              className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+            >
               Features
-            </a>
-            <a href="#how-it-works" className="hover:text-[#f5f4f0] transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("how-it-works")}
+              className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+            >
               How It Works
-            </a>
-            <a href="#platforms" className="hover:text-[#f5f4f0] transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("platforms")}
+              className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+            >
               Platforms
-            </a>
-            <a href="#byok" className="hover:text-[#f5f4f0] transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("byok")}
+              className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+            >
               BYOK
-            </a>
+            </button>
           </nav>
 
           {/* RIGHT: AUTH CONTROLS */}
@@ -205,41 +240,41 @@ export default function PublicHomepage() {
         {mobileMenuOpen && (
           <div className="md:hidden border-b border-white/10 bg-[#14161a] px-6 py-6 space-y-4">
             <nav className="flex flex-col space-y-3 text-sm text-[#9e9d98]">
-              <a
-                href="#features"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#f5f4f0] py-1"
+              <button
+                type="button"
+                onClick={() => scrollToSectionMobile("features")}
+                className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Product
-              </a>
-              <a
-                href="#capabilities"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#f5f4f0] py-1"
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSectionMobile("capabilities")}
+                className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Features
-              </a>
-              <a
-                href="#how-it-works"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#f5f4f0] py-1"
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSectionMobile("how-it-works")}
+                className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 How It Works
-              </a>
-              <a
-                href="#platforms"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#f5f4f0] py-1"
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSectionMobile("platforms")}
+                className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Platforms
-              </a>
-              <a
-                href="#byok"
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-[#f5f4f0] py-1"
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSectionMobile("byok")}
+                className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 BYOK Architecture
-              </a>
+              </button>
             </nav>
             <div className="pt-4 border-t border-white/10 flex flex-col gap-3">
               <Link
@@ -297,12 +332,13 @@ export default function PublicHomepage() {
           >
             Start Creating <ArrowRight className="w-5 h-5" />
           </Link>
-          <a
-            href="#features"
-            className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2"
+          <button
+            type="button"
+            onClick={() => scrollToSection("features")}
+            className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             Explore the Platform
-          </a>
+          </button>
         </div>
 
         {/* HERO VISUAL — WORKFLOW STUDIO MOCKUP */}
@@ -865,12 +901,13 @@ export default function PublicHomepage() {
             >
               Start Creating <ArrowRight className="w-5 h-5" />
             </Link>
-            <a
-              href="#features"
-              className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center"
+            <button
+              type="button"
+              onClick={() => scrollToSection("features")}
+              className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center cursor-pointer"
             >
               Explore Platform
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -900,29 +937,49 @@ export default function PublicHomepage() {
               </h5>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="#features" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("features")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     Product Workflow
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#capabilities" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("capabilities")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     Core Features
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#how-it-works" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("how-it-works")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     How It Works
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#platforms" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("platforms")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     Supported Platforms
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#byok" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("byok")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     BYOK Model
-                  </a>
+                  </button>
                 </li>
                 <li>
                   <Link href="/pricing" className="hover:text-[#f5f4f0] transition-colors">
@@ -944,9 +1001,9 @@ export default function PublicHomepage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#contact" className="hover:text-[#f5f4f0] transition-colors">
+                  <Link href="/about" className="hover:text-[#f5f4f0] transition-colors">
                     Contact Us
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <Link href="/login" className="hover:text-[#f5f4f0] transition-colors">
@@ -968,24 +1025,32 @@ export default function PublicHomepage() {
               </h5>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="#" className="hover:text-[#f5f4f0] transition-colors">
+                  <Link href="/about" className="hover:text-[#f5f4f0] transition-colors">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-[#f5f4f0] transition-colors">
+                  <Link href="/about" className="hover:text-[#f5f4f0] transition-colors">
                     Terms of Service
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("byok")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     API Credentials Policy
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-[#f5f4f0] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("byok")}
+                    className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
+                  >
                     Security Architecture
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>
