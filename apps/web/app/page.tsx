@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -40,20 +40,57 @@ export default function PublicHomepage() {
     "command-center" | "image-studio" | "video-studio" | "media-editor" | "calendar" | "analytics"
   >("command-center");
 
-  const scrollToSection = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({
+  const sectionMap: Record<string, string> = {
+    "/product": "features",
+    "/features": "capabilities",
+    "/how-it-works": "how-it-works",
+    "/platforms": "platforms",
+    "/byok": "byok",
+  };
+
+  const navigateToSection = (path: string, id: string) => {
+    if (typeof window === "undefined") return;
+    const element = document.getElementById(id);
+    if (!element) return;
+
+    window.history.pushState({}, "", path);
+
+    element.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
   };
 
-  const scrollToSectionMobile = (id: string) => {
+  const navigateToSectionMobile = (path: string, id: string) => {
     setMobileMenuOpen(false);
-    document.getElementById(id)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    setTimeout(() => {
+      navigateToSection(path, id);
+    }, 60);
   };
+
+  useEffect(() => {
+    const handleRouteScroll = () => {
+      const path = window.location.pathname;
+      const targetId = sectionMap[path];
+      if (targetId) {
+        setTimeout(() => {
+          document.getElementById(targetId)?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100);
+      } else if (path === "/") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+
+    handleRouteScroll();
+
+    window.addEventListener("popstate", handleRouteScroll);
+    return () => {
+      window.removeEventListener("popstate", handleRouteScroll);
+    };
+  }, []);
 
   const workflowSteps = [
     { step: "01", name: "IDEA", desc: "Brainstorm topics & content pillars", icon: Target },
@@ -163,7 +200,17 @@ export default function PublicHomepage() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0b0c0e]/85 backdrop-blur-xl transition-all">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* LEFT: LOGO */}
-          <Link href="/" className="flex items-center gap-3 group">
+          <Link
+            href="/"
+            onClick={(e) => {
+              if (window.location.pathname !== "/") {
+                e.preventDefault();
+                window.history.pushState({}, "", "/");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+            className="flex items-center gap-3 group"
+          >
             <img
               src="/logo-mark.png"
               alt="AI Social Media Studio"
@@ -175,35 +222,35 @@ export default function PublicHomepage() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#9e9d98]">
             <button
               type="button"
-              onClick={() => scrollToSection("features")}
+              onClick={() => navigateToSection("/product", "features")}
               className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
             >
               Product
             </button>
             <button
               type="button"
-              onClick={() => scrollToSection("capabilities")}
+              onClick={() => navigateToSection("/features", "capabilities")}
               className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
             >
               Features
             </button>
             <button
               type="button"
-              onClick={() => scrollToSection("how-it-works")}
+              onClick={() => navigateToSection("/how-it-works", "how-it-works")}
               className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
             >
               How It Works
             </button>
             <button
               type="button"
-              onClick={() => scrollToSection("platforms")}
+              onClick={() => navigateToSection("/platforms", "platforms")}
               className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
             >
               Platforms
             </button>
             <button
               type="button"
-              onClick={() => scrollToSection("byok")}
+              onClick={() => navigateToSection("/byok", "byok")}
               className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
             >
               BYOK
@@ -242,35 +289,35 @@ export default function PublicHomepage() {
             <nav className="flex flex-col space-y-3 text-sm text-[#9e9d98]">
               <button
                 type="button"
-                onClick={() => scrollToSectionMobile("features")}
+                onClick={() => navigateToSectionMobile("/product", "features")}
                 className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Product
               </button>
               <button
                 type="button"
-                onClick={() => scrollToSectionMobile("capabilities")}
+                onClick={() => navigateToSectionMobile("/features", "capabilities")}
                 className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Features
               </button>
               <button
                 type="button"
-                onClick={() => scrollToSectionMobile("how-it-works")}
+                onClick={() => navigateToSectionMobile("/how-it-works", "how-it-works")}
                 className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 How It Works
               </button>
               <button
                 type="button"
-                onClick={() => scrollToSectionMobile("platforms")}
+                onClick={() => navigateToSectionMobile("/platforms", "platforms")}
                 className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 Platforms
               </button>
               <button
                 type="button"
-                onClick={() => scrollToSectionMobile("byok")}
+                onClick={() => navigateToSectionMobile("/byok", "byok")}
                 className="hover:text-[#f5f4f0] py-1 text-left cursor-pointer"
               >
                 BYOK Architecture
@@ -334,7 +381,7 @@ export default function PublicHomepage() {
           </Link>
           <button
             type="button"
-            onClick={() => scrollToSection("features")}
+            onClick={() => navigateToSection("/product", "features")}
             className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             Explore the Platform
@@ -436,7 +483,7 @@ export default function PublicHomepage() {
       </section>
 
       {/* 3. SECTION 2 — PLATFORM VALUE (HORIZONTAL WORKFLOW) */}
-      <section id="features" className="py-20 border-t border-white/10 bg-[#0d0f12]">
+      <section id="features" className="py-20 border-t border-white/10 bg-[#0d0f12] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-xs font-mono font-medium text-[#c5a059] tracking-widest uppercase mb-3">
@@ -481,7 +528,7 @@ export default function PublicHomepage() {
       </section>
 
       {/* 4. SECTION 3 — CORE CAPABILITIES (6 CARDS) */}
-      <section id="capabilities" className="py-24 border-t border-white/10 bg-[#0b0c0e]">
+      <section id="capabilities" className="py-24 border-t border-white/10 bg-[#0b0c0e] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-xs font-mono font-medium text-[#c5a059] tracking-widest uppercase mb-3">
@@ -532,7 +579,7 @@ export default function PublicHomepage() {
       </section>
 
       {/* 5. SECTION 4 — PLATFORMS */}
-      <section id="platforms" className="py-24 border-t border-white/10 bg-[#0d0f12]">
+      <section id="platforms" className="py-24 border-t border-white/10 bg-[#0d0f12] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-xs font-mono font-medium text-[#c5a059] tracking-widest uppercase mb-3">
@@ -574,7 +621,7 @@ export default function PublicHomepage() {
       </section>
 
       {/* 6. SECTION 5 — BRING YOUR OWN PROVIDERS (BYOK) */}
-      <section id="byok" className="py-24 border-t border-white/10 bg-[#0b0c0e]">
+      <section id="byok" className="py-24 border-t border-white/10 bg-[#0b0c0e] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="p-8 md:p-14 rounded-3xl bg-gradient-to-br from-[#14161a] via-[#16181d] to-[#0b0c0e] border border-[#c5a059]/30 relative overflow-hidden">
             <div className="max-w-3xl">
@@ -627,7 +674,7 @@ export default function PublicHomepage() {
       </section>
 
       {/* 7. SECTION 6 — HOW IT WORKS (4 STEPS) */}
-      <section id="how-it-works" className="py-24 border-t border-white/10 bg-[#0d0f12]">
+      <section id="how-it-works" className="py-24 border-t border-white/10 bg-[#0d0f12] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-xs font-mono font-medium text-[#c5a059] tracking-widest uppercase mb-3">
@@ -903,7 +950,7 @@ export default function PublicHomepage() {
             </Link>
             <button
               type="button"
-              onClick={() => scrollToSection("features")}
+              onClick={() => navigateToSection("/product", "features")}
               className="w-full sm:w-auto text-base font-medium bg-[#14161a] hover:bg-[#1c1f26] border border-white/10 text-[#f5f4f0] hover:border-[#c5a059]/40 px-8 py-4 rounded-xl transition-all flex items-center justify-center cursor-pointer"
             >
               Explore Platform
@@ -939,7 +986,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("features")}
+                    onClick={() => navigateToSection("/product", "features")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     Product Workflow
@@ -948,7 +995,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("capabilities")}
+                    onClick={() => navigateToSection("/features", "capabilities")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     Core Features
@@ -957,7 +1004,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("how-it-works")}
+                    onClick={() => navigateToSection("/how-it-works", "how-it-works")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     How It Works
@@ -966,7 +1013,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("platforms")}
+                    onClick={() => navigateToSection("/platforms", "platforms")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     Supported Platforms
@@ -975,7 +1022,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("byok")}
+                    onClick={() => navigateToSection("/byok", "byok")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     BYOK Model
@@ -1037,7 +1084,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("byok")}
+                    onClick={() => navigateToSection("/byok", "byok")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     API Credentials Policy
@@ -1046,7 +1093,7 @@ export default function PublicHomepage() {
                 <li>
                   <button
                     type="button"
-                    onClick={() => scrollToSection("byok")}
+                    onClick={() => navigateToSection("/byok", "byok")}
                     className="hover:text-[#f5f4f0] transition-colors cursor-pointer"
                   >
                     Security Architecture
