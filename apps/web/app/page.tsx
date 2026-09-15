@@ -150,9 +150,9 @@ export default function PublicHomepage() {
           {/* LEFT: LOGO */}
           <Link href="/" className="flex items-center gap-3 group">
             <img
-              src="/logo.jpg"
+              src="/logo-mark.png"
               alt="AI Social Media Studio"
-              className="h-11 w-auto object-contain rounded-xl border border-white/[0.08] shadow-lg shadow-[#c5a059]/20 group-hover:scale-105 transition-all duration-300"
+              className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 lg:h-[70px] lg:w-[70px] object-contain group-hover:scale-105 transition-all duration-300"
             />
           </Link>
 
@@ -883,9 +883,9 @@ export default function PublicHomepage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <img
-                  src="/logo.jpg"
+                  src="/logo-horizontal.png"
                   alt="AI Social Media Studio"
-                  className="h-9 w-auto object-contain rounded-lg border border-white/10"
+                  className="h-8 w-auto object-contain"
                 />
               </div>
               <p className="text-xs text-[#9e9d98] leading-relaxed">

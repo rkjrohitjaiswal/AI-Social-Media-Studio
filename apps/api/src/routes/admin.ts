@@ -1,38 +1,48 @@
 import { Router, Response } from "express";
 import prisma from "@ai-social/database";
 import { AuthenticatedRequest, requireAuth, requireAdmin } from "../middleware/auth.js";
-import { SAAS_PLANS_REGISTRY, SubscriptionPlan } from "@ai-social/shared";
-
-import { authenticateAdminCredentials, ensureInitialAdminAccount } from "../services/admin-auth-service.js";
+import {
+  authenticateAdminCredentials,
+  ensureInitialAdminAccount,
+} from "../services/admin-auth-service.js";
 
 export const adminRouter = Router();
 
 /**
  * POST /api/admin/auth/login
- * Dedicated authentication endpoint for system administrators.
+ * Public admin login endpoint. Accepts admin credentials, authenticates securely,
+ * sets a HTTP-only admin session cookie, and returns a stateless admin session token.
  */
-adminRouter.post("/auth/login", async (req, res) => {
+adminRouter.post("/auth/login", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: "Admin email and password are required" });
+
+    if (!email || typeof email !== "string" || !password || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Email and password are required",
+      });
     }
 
-    const authResult = await authenticateAdminCredentials(String(email), String(password));
+    const authResult = await authenticateAdminCredentials(email, password);
+
     if (!authResult.success || !authResult.session) {
-      return res.status(401).json({ success: false, error: authResult.error || "Invalid credentials" });
+      return res.status(401).json({
+        success: false,
+        error: authResult.error || "Invalid admin credentials",
+      });
     }
 
+    // Set secure HTTP-only cookie for web clients
     res.cookie("admin-access-token", authResult.session.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
     return res.json({
       success: true,
-      message: "Admin authentication successful",
       token: authResult.session.token,
       user: {
         id: authResult.session.userId,
@@ -42,7 +52,10 @@ adminRouter.post("/auth/login", async (req, res) => {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return res.status(500).json({ success: false, error: `Authentication failed: ${msg}` });
+    return res.status(500).json({
+      success: false,
+      error: `Admin login failed: ${msg}`,
+    });
   }
 });
 
@@ -67,19 +80,20 @@ adminRouter.use(requireAdmin as any);
  */
 adminRouter.get("/stats", async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const totalUsers = await prisma.user.count();
-    
-    const activeSubscriptions = await prisma.subscription.count({
-      where: { status: "ACTIVE" },
-    });
+    const [totalUsersRaw, activeSubscriptionsRaw, paidUsersRaw] = await Promise.all([
+      prisma.user.count().catch(() => 0),
+      prisma.subscription.count({ where: { status: "ACTIVE" } }).catch(() => 0),
+      prisma.subscription.count({
+        where: {
+          status: "ACTIVE",
+          plan: { in: ["PRO", "ADVANCED", "PREMIUM", "BUSINESS"] },
+        },
+      }).catch(() => 0),
+    ]);
 
-    const paidUsers = await prisma.subscription.count({
-      where: {
-        status: "ACTIVE",
-        plan: { in: ["PRO", "ADVANCED", "PREMIUM", "BUSINESS"] },
-      },
-    });
-
+    const totalUsers = typeof totalUsersRaw === "number" ? totalUsersRaw : 0;
+    const activeSubscriptions = typeof activeSubscriptionsRaw === "number" ? activeSubscriptionsRaw : 0;
+    const paidUsers = typeof paidUsersRaw === "number" ? paidUsersRaw : 0;
     const freeUsers = Math.max(0, totalUsers - paidUsers);
 
     return res.json({
@@ -151,8 +165,8 @@ adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
 
     const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
 
-    const [total, users] = await Promise.all([
-      prisma.user.count({ where: whereClause }),
+    const [totalRaw, usersRaw] = await Promise.all([
+      prisma.user.count({ where: whereClause }).catch(() => 0),
       prisma.user.findMany({
         where: whereClause,
         select: {
@@ -170,28 +184,43 @@ adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
-      }),
+      }).catch(() => []),
     ]);
+
+    const total = typeof totalRaw === "number" ? totalRaw : 0;
+    const users = Array.isArray(usersRaw) ? usersRaw : [];
 
     const formattedUsers = users.map((u: any) => {
       const sub = u.subscription;
       const usage = u.usage;
       const plan = sub && sub.status === "ACTIVE" ? sub.plan : "FREE";
-      const totalCredits = usage ? usage.freeCreditsTotal : 10;
-      const usedCredits = usage ? usage.freeCreditsUsed : 0;
+      const totalCredits = usage ? (usage.freeCreditsTotal ?? 10) : 10;
+      const usedCredits = usage ? (usage.freeCreditsUsed ?? 0) : 0;
       const remainingCredits = Math.max(0, totalCredits - usedCredits);
+
+      const createdAtStr = u.createdAt
+        ? typeof u.createdAt === "string"
+          ? u.createdAt
+          : new Date(u.createdAt).toISOString()
+        : new Date().toISOString();
+
+      const currentPeriodEndStr = sub?.currentPeriodEnd
+        ? typeof sub.currentPeriodEnd === "string"
+          ? sub.currentPeriodEnd
+          : new Date(sub.currentPeriodEnd).toISOString()
+        : null;
 
       return {
         id: u.id,
         email: u.email,
         name: u.fullName || u.firstName || u.email.split("@")[0],
         avatarUrl: u.avatarUrl,
-        isAdmin: u.isAdmin,
-        createdAt: u.createdAt.toISOString(),
+        isAdmin: !!u.isAdmin,
+        createdAt: createdAtStr,
         currentPlan: plan,
         subscriptionStatus: sub?.status || "EXPIRED",
         subscriptionSource: sub?.subscriptionSource || "RAZORPAY",
-        currentPeriodEnd: sub?.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
+        currentPeriodEnd: currentPeriodEndStr,
         creditsTotal: totalCredits,
         creditsUsed: usedCredits,
         creditsRemaining: remainingCredits,
@@ -205,7 +234,7 @@ adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
     });
   } catch (err: unknown) {
@@ -215,106 +244,107 @@ adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
 });
 
 /**
- * POST /api/admin/users/:id/subscription
- * Grants or changes a subscription plan for a target user (ADMIN_GRANT).
+ * POST /api/admin/users/:id/grant-subscription
+ * Manually grant or extend a user's subscription (PRO, ADVANCED, PREMIUM, BUSINESS).
  */
-adminRouter.post("/users/:id/subscription", async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const targetUserId = req.params.id;
-    const { plan, durationDays = 30, notes } = req.body;
+    const { id: userId } = req.params;
+    const { plan = "PRO", durationDays = 30, notes } = req.body || {};
 
-    const validPlans: SubscriptionPlan[] = ["PRO", "ADVANCED", "PREMIUM", "BUSINESS"];
-    if (!validPlans.includes(plan)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid plan. Must be one of: ${validPlans.join(", ")}`,
-      });
+    const validPlans = ["PRO", "ADVANCED", "PREMIUM", "BUSINESS"];
+    if (!validPlans.includes(plan.toUpperCase())) {
+      return res.status(400).json({ success: false, error: "Invalid subscription plan" });
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      include: { subscription: true, usage: true },
+    const duration = Math.max(1, parseInt(String(durationDays), 10) || 30);
+    const selectedPlan = plan.toUpperCase();
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, subscription: true },
     });
 
-    if (!targetUser) {
-      return res.status(404).json({ success: false, error: "Target user not found" });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    const previousPlan = targetUser.subscription?.status === "ACTIVE" ? targetUser.subscription.plan : "FREE";
+    const previousPlan = user.subscription?.plan || "FREE";
     const now = new Date();
-    const durationMs = parseInt(String(durationDays), 10) * 86400000;
-    const expiresAt = new Date(now.getTime() + durationMs);
+    const periodEnd = new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);
 
-    // 1. Upsert Subscription record with ADMIN_GRANT source
-    const updatedSub = await prisma.subscription.upsert({
-      where: { userId: targetUserId },
+    const subscription = await prisma.subscription.upsert({
+      where: { userId },
       update: {
-        plan,
+        plan: selectedPlan,
         status: "ACTIVE",
-        subscriptionSource: "ADMIN_GRANT",
-        grantedByUserId: req.user!.id,
-        grantedAt: now,
+        subscriptionSource: "MANUAL_ADMIN",
         currentPeriodStart: now,
-        currentPeriodEnd: expiresAt,
-        notes: notes || `Granted by admin ${req.user!.email}`,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
       },
       create: {
-        userId: targetUserId,
-        provider: "ADMIN_GRANT",
-        subscriptionSource: "ADMIN_GRANT",
-        grantedByUserId: req.user!.id,
-        grantedAt: now,
-        plan,
+        userId,
+        plan: selectedPlan,
         status: "ACTIVE",
+        subscriptionSource: "MANUAL_ADMIN",
         currentPeriodStart: now,
-        currentPeriodEnd: expiresAt,
-        notes: notes || `Granted by admin ${req.user!.email}`,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
       },
     });
 
-    // 2. Grant workflow credit entitlement corresponding to the plan
-    const planEntitlement = SAAS_PLANS_REGISTRY[plan as SubscriptionPlan];
-    const newCreditLimit = planEntitlement ? planEntitlement.monthlyWorkflows : 50;
+    // Credit allowances by plan
+    const creditMap: Record<string, number> = {
+      PRO: 100,
+      ADVANCED: 250,
+      PREMIUM: 500,
+      BUSINESS: 1000,
+    };
 
+    const newAllowance = creditMap[selectedPlan] || 100;
     await prisma.userUsage.upsert({
-      where: { userId: targetUserId },
+      where: { userId },
       update: {
-        monthlyCreditsAllowance: newCreditLimit,
+        freeCreditsTotal: newAllowance,
+        freeCreditsUsed: 0,
+        monthlyCreditsAllowance: newAllowance,
         monthlyCreditsUsed: 0,
         lastMonthlyReset: now,
-        freeCreditsTotal: newCreditLimit,
-        freeCreditsUsed: 0,
-        updatedAt: now,
       },
       create: {
-        userId: targetUserId,
-        freeCreditsTotal: newCreditLimit,
+        userId,
+        freeCreditsTotal: newAllowance,
         freeCreditsUsed: 0,
-        permanentCreditsTotal: 10,
+        permanentCreditsTotal: newAllowance,
         permanentCreditsUsed: 0,
-        monthlyCreditsAllowance: newCreditLimit,
+        monthlyCreditsAllowance: newAllowance,
         monthlyCreditsUsed: 0,
         lastMonthlyReset: now,
       },
     });
 
-    // 3. Create Audit Log Entry
-    await prisma.adminAuditLog.create({
-      data: {
-        adminUserId: req.user!.id,
-        targetUserId,
-        action: previousPlan === "FREE" ? "GRANT_SUBSCRIPTION" : "CHANGE_SUBSCRIPTION",
-        previousPlan,
-        newPlan: plan,
-        subscriptionSource: "ADMIN_GRANT",
-        metadataJson: { durationDays, notes },
-      },
-    });
+    // Record admin audit log
+    try {
+      await prisma.adminAuditLog.create({
+        data: {
+          adminUserId: req.user?.id || "system",
+          targetUserId: userId,
+          action: "GRANT_SUBSCRIPTION",
+          previousPlan,
+          newPlan: selectedPlan,
+          subscriptionSource: "MANUAL_ADMIN",
+          metadataJson: { durationDays: duration, notes: notes || "Granted by admin" },
+        },
+      });
+    } catch {
+      // Non-fatal audit log catch
+    }
 
     return res.json({
       success: true,
-      message: `Successfully granted ${plan} plan to ${targetUser.email} for ${durationDays} days.`,
-      subscription: updatedSub,
+      message: `Successfully granted ${selectedPlan} subscription for ${duration} days`,
+      subscription,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -323,81 +353,83 @@ adminRouter.post("/users/:id/subscription", async (req: AuthenticatedRequest, re
 });
 
 /**
- * DELETE /api/admin/users/:id/subscription
- * Revokes an admin-granted subscription. Preserves real Razorpay subscriptions.
+ * POST /api/admin/users/:id/revoke-subscription
+ * Revoke or cancel an active manual subscription, resetting the user to FREE plan.
  */
-adminRouter.delete("/users/:id/subscription", async (req: AuthenticatedRequest, res: Response) => {
+adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const targetUserId = req.params.id;
+    const { id: userId } = req.params;
+    const { notes } = req.body || {};
 
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: targetUserId },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, subscription: true },
     });
 
-    if (!sub) {
-      return res.status(404).json({ success: false, error: "No active subscription found for user" });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    if (sub.subscriptionSource !== "ADMIN_GRANT") {
-      return res.status(400).json({
-        success: false,
-        error: "Cannot revoke a paid Razorpay subscription using admin grant revoke. Use billing cancellation instead.",
-      });
-    }
+    const previousPlan = user.subscription?.plan || "FREE";
 
-    const previousPlan = sub.plan;
-    const now = new Date();
-
-    // 1. Reset subscription to FREE / EXPIRED
-    const updatedSub = await prisma.subscription.update({
-      where: { userId: targetUserId },
-      data: {
-        plan: "FREE",
-        status: "EXPIRED",
-        subscriptionSource: "RAZORPAY",
-        currentPeriodEnd: now,
-      },
-    });
-
-    // 2. Reset user monthly credits to FREE default (3), preserving permanent credits
-    await prisma.userUsage.upsert({
-      where: { userId: targetUserId },
+    const subscription = await prisma.subscription.upsert({
+      where: { userId },
       update: {
-        monthlyCreditsAllowance: 3,
-        monthlyCreditsUsed: 0,
-        freeCreditsTotal: 3,
-        freeCreditsUsed: 0,
-        lastMonthlyReset: now,
-        updatedAt: now,
+        plan: "FREE",
+        status: "CANCELED",
+        subscriptionSource: "MANUAL_ADMIN",
+        currentPeriodEnd: new Date(),
       },
       create: {
-        userId: targetUserId,
+        userId,
+        plan: "FREE",
+        status: "CANCELED",
+        subscriptionSource: "MANUAL_ADMIN",
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(),
+      },
+    });
+
+    await prisma.userUsage.upsert({
+      where: { userId },
+      update: {
+        freeCreditsTotal: 10,
+        freeCreditsUsed: 0,
+        monthlyCreditsAllowance: 3,
+        monthlyCreditsUsed: 0,
+      },
+      create: {
+        userId,
         freeCreditsTotal: 10,
         freeCreditsUsed: 0,
         permanentCreditsTotal: 10,
         permanentCreditsUsed: 0,
         monthlyCreditsAllowance: 3,
         monthlyCreditsUsed: 0,
-        lastMonthlyReset: now,
       },
     });
 
-    // 3. Create Audit Log Entry
-    await prisma.adminAuditLog.create({
-      data: {
-        adminUserId: req.user!.id,
-        targetUserId,
-        action: "REVOKE_SUBSCRIPTION",
-        previousPlan,
-        newPlan: "FREE",
-        subscriptionSource: "ADMIN_GRANT",
-      },
-    });
+    // Record admin audit log
+    try {
+      await prisma.adminAuditLog.create({
+        data: {
+          adminUserId: req.user?.id || "system",
+          targetUserId: userId,
+          action: "REVOKE_SUBSCRIPTION",
+          previousPlan,
+          newPlan: "FREE",
+          subscriptionSource: "MANUAL_ADMIN",
+          metadataJson: { notes: notes || "Revoked by admin" },
+        },
+      });
+    } catch {
+      // Non-fatal audit log catch
+    }
 
     return res.json({
       success: true,
-      message: "Admin-granted subscription revoked successfully.",
-      subscription: updatedSub,
+      message: `Successfully revoked subscription for user ${user.email}`,
+      subscription,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -407,67 +439,70 @@ adminRouter.delete("/users/:id/subscription", async (req: AuthenticatedRequest, 
 
 /**
  * POST /api/admin/users/:id/credits
- * Manually adjusts credit allowance or resets used credits for a user.
+ * Top-up bonus credits or reset used credits for a specific user.
  */
 adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const targetUserId = req.params.id;
-    const { bonusCredits = 0, resetUsage = false, notes } = req.body;
+    const { id: userId } = req.params;
+    const { bonusCredits = 0, resetUsage = false, notes } = req.body || {};
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      include: { usage: true, subscription: true },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, usage: true },
     });
 
-    if (!targetUser) {
-      return res.status(404).json({ success: false, error: "Target user not found" });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    const now = new Date();
-    const currentTotal = targetUser.usage?.freeCreditsTotal || 10;
-    const currentUsed = targetUser.usage?.freeCreditsUsed || 0;
+    const currentTotal = user.usage?.freeCreditsTotal ?? 10;
+    const currentUsed = user.usage?.freeCreditsUsed ?? 0;
+    const additional = Math.max(0, parseInt(String(bonusCredits), 10) || 0);
 
-    const newTotal = currentTotal + Math.max(0, parseInt(String(bonusCredits), 10) || 0);
-    const newUsed = resetUsage ? 0 : currentUsed;
+    const newTotal = currentTotal + additional;
+    const newUsed = resetUsage === true ? 0 : currentUsed;
 
-    const updatedUsage = await prisma.userUsage.upsert({
-      where: { userId: targetUserId },
+    const usage = await prisma.userUsage.upsert({
+      where: { userId },
       update: {
         freeCreditsTotal: newTotal,
-        monthlyCreditsAllowance: newTotal,
         freeCreditsUsed: newUsed,
-        monthlyCreditsUsed: newUsed,
-        updatedAt: now,
       },
       create: {
-        userId: targetUserId,
+        userId,
         freeCreditsTotal: newTotal,
         freeCreditsUsed: newUsed,
         permanentCreditsTotal: newTotal,
         permanentCreditsUsed: newUsed,
-        monthlyCreditsAllowance: newTotal,
-        monthlyCreditsUsed: newUsed,
-        lastMonthlyReset: now,
+        monthlyCreditsAllowance: 3,
+        monthlyCreditsUsed: 0,
       },
     });
 
-    // Create Audit Log Entry
-    await prisma.adminAuditLog.create({
-      data: {
-        adminUserId: req.user!.id,
-        targetUserId,
-        action: resetUsage ? "RESET_CREDITS" : "ADD_CREDITS",
-        previousPlan: targetUser.subscription?.plan || "FREE",
-        newPlan: targetUser.subscription?.plan || "FREE",
-        subscriptionSource: targetUser.subscription?.subscriptionSource || "RAZORPAY",
-        metadataJson: { bonusCredits, resetUsage, previousTotal: currentTotal, newTotal, notes },
-      },
-    });
+    // Record admin audit log
+    try {
+      await prisma.adminAuditLog.create({
+        data: {
+          adminUserId: req.user?.id || "system",
+          targetUserId: userId,
+          action: "ADJUST_CREDITS",
+          metadataJson: {
+            bonusCredits: additional,
+            resetUsage,
+            newTotal,
+            newUsed,
+            notes: notes || "Credit adjustment by admin",
+          },
+        },
+      });
+    } catch {
+      // Non-fatal audit log catch
+    }
 
     return res.json({
       success: true,
-      message: `Successfully updated credits for ${targetUser.email}. Total: ${newTotal}, Used: ${newUsed}`,
-      usage: updatedUsage,
+      message: `Successfully updated credits for ${user.email}`,
+      usage,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -484,8 +519,8 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
     const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "20"), 10)));
 
-    const [total, logs] = await Promise.all([
-      prisma.adminAuditLog.count(),
+    const [totalRaw, logsRaw] = await Promise.all([
+      prisma.adminAuditLog.count().catch(() => 0),
       prisma.adminAuditLog.findMany({
         select: {
           id: true,
@@ -507,8 +542,11 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
-      }),
+      }).catch(() => []),
     ]);
+
+    const total = typeof totalRaw === "number" ? totalRaw : 0;
+    const logs = Array.isArray(logsRaw) ? logsRaw : [];
 
     const formattedLogs = logs.map((l: any) => ({
       id: l.id,
@@ -521,7 +559,11 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
       newPlan: l.newPlan,
       subscriptionSource: l.subscriptionSource,
       metadata: l.metadataJson,
-      createdAt: l.createdAt.toISOString(),
+      createdAt: l.createdAt
+        ? typeof l.createdAt === "string"
+          ? l.createdAt
+          : new Date(l.createdAt).toISOString()
+        : new Date().toISOString(),
     }));
 
     return res.json({
@@ -531,7 +573,7 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
     });
   } catch (err: unknown) {

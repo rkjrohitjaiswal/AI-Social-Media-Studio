@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import prisma from "@ai-social/database";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
 import { saveProviderKeySchema, saveOpenAiKeySchema } from "@ai-social/shared";
 import {
@@ -187,18 +188,36 @@ settingsRouter.get("/profile", async (req: AuthenticatedRequest, res: Response) 
     const userId = req.user!.id;
     const email = req.user!.email || "user@studio.ai";
 
+    let dbUser: any = null;
+    try {
+      dbUser = await prisma.user.findFirst({
+        where: { OR: [{ id: userId }, { supabaseUid: userId }, { email }] },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+          createdAt: true,
+        },
+      });
+    } catch {
+      // Non-fatal
+    }
+
     const memProfile = inMemoryProfileStore.get(userId);
-    const profile = memProfile || {
-      id: userId,
-      email,
-      fullName: "Creator Admin",
+    const profile = {
+      id: dbUser?.id || userId,
+      email: dbUser?.email || email,
+      fullName: dbUser?.fullName || dbUser?.firstName || memProfile?.fullName || email.split("@")[0] || "Creator Admin",
       role: "OWNER",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
-      createdAt: new Date().toISOString(),
+      avatarUrl: dbUser?.avatarUrl || memProfile?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
+      createdAt: dbUser?.createdAt ? new Date(dbUser.createdAt).toISOString() : memProfile?.createdAt || new Date().toISOString(),
       workspaceCount: 1,
     };
 
-    return res.json({ success: true, data: profile });
+    return res.json({ success: true, data: profile, user: profile });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to fetch profile";
     return res.status(500).json({ error: msg });
@@ -212,12 +231,31 @@ settingsRouter.patch("/profile", async (req: AuthenticatedRequest, res: Response
     const email = req.user!.email || "user@studio.ai";
     const { fullName, avatarUrl } = req.body;
 
+    let dbUser: any = null;
+    try {
+      dbUser = await prisma.user.findFirst({
+        where: { OR: [{ id: userId }, { supabaseUid: userId }, { email }] },
+      });
+
+      if (dbUser) {
+        dbUser = await prisma.user.update({
+          where: { id: dbUser.id },
+          data: {
+            ...(fullName ? { fullName } : {}),
+            ...(avatarUrl ? { avatarUrl } : {}),
+          },
+        });
+      }
+    } catch {
+      // Non-fatal
+    }
+
     const current = inMemoryProfileStore.get(userId) || {
-      id: userId,
-      email,
-      fullName: "Creator Admin",
+      id: dbUser?.id || userId,
+      email: dbUser?.email || email,
+      fullName: dbUser?.fullName || "Creator Admin",
       role: "OWNER",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
+      avatarUrl: dbUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
       createdAt: new Date().toISOString(),
       workspaceCount: 1,
     };

@@ -135,6 +135,16 @@ export default function AdminDashboardPage() {
           type: "error",
           text: "Unable to load user directory data from API backend.",
         });
+      } else if (!statsRes) {
+        setToastMessage({
+          type: "error",
+          text: "Unable to fetch overview analytics stats.",
+        });
+      } else if (!usersRes) {
+        setToastMessage({
+          type: "error",
+          text: "Unable to fetch user directory listing.",
+        });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -1,16 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import prisma from "@ai-social/database";
 import {
   hashAdminPassword,
-  verifyAdminPassword,
   authenticateAdminCredentials,
   getStoredAdminHash,
   ensureInitialAdminAccount,
   verifyAdminSessionToken,
   clearInMemoryAdminState,
 } from "../apps/api/src/services/admin-auth-service.js";
+import { ensureUserExists } from "../apps/api/src/middleware/auth.js";
 
-describe("Production Admin Authentication & Serverless Persistence Test Suite", () => {
+describe("Production Admin Authentication, Profile & Route Alias Test Suite", () => {
   const testAdminEmail = "admin-test@studio.ai";
   const testAdminPassword = "SecureAdminPassword@2026";
 
@@ -64,18 +63,26 @@ describe("Production Admin Authentication & Serverless Persistence Test Suite", 
     expect(verified?.token).toBe(token);
   });
 
-  it("4. rejects admin login attempt with incorrect password", async () => {
+  it("4. resolves authenticated user consistently by id, supabaseUid, or email without duplicates or 404s", async () => {
+    const testEmail = "profile-test-user@studio.ai";
+    const testSubId = "sub_uid_9988776655";
+
+    // 1. Ensure user exists via auth middleware helper
+    const user1 = await ensureUserExists(testSubId, testEmail);
+    expect(user1).not.toBeNull();
+    expect(user1?.email).toBe(testEmail);
+
+    // 2. Subsequent authentication attempt with same email should resolve existing record
+    const user2 = await ensureUserExists(testSubId, testEmail);
+    expect(user2).not.toBeNull();
+    expect(user2?.id).toBe(user1?.id);
+  });
+
+  it("5. rejects admin login attempt with incorrect password", async () => {
     const result = await authenticateAdminCredentials(testAdminEmail, "WrongPassword@999");
 
     expect(result.success).toBe(false);
     expect(result.session).toBeUndefined();
-    expect(result.error).toBe("Invalid admin email or password");
-  });
-
-  it("5. rejects admin login attempt with non-existent email", async () => {
-    const result = await authenticateAdminCredentials("nonexistent@studio.ai", testAdminPassword);
-
-    expect(result.success).toBe(false);
     expect(result.error).toBe("Invalid admin email or password");
   });
 

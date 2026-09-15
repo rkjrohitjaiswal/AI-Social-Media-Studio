@@ -63,9 +63,9 @@ export default function ForgotPasswordPage() {
         <div className="relative z-20">
           <Link href="/" className="inline-flex items-center gap-3 group">
             <img
-              src="/logo.jpg"
+              src="/logo-horizontal.png"
               alt="AI Social Media Studio"
-              className="h-10 w-auto object-contain rounded-xl border border-white/[0.08] shadow-md shadow-[#D4AF37]/15 group-hover:scale-105 transition-all"
+              className="h-9 md:h-10 w-auto object-contain group-hover:scale-105 transition-all"
             />
           </Link>
         </div>
@@ -82,10 +82,6 @@ export default function ForgotPasswordPage() {
             Enter your accredited email to receive an encrypted reset link directly to your inbox.
           </p>
         </div>
-
-        <div className="relative z-20 text-[11px] text-[#6b6a65] font-mono">
-          © 2026 Haute Atelier Systems Inc.
-        </div>
       </div>
 
       {/* RIGHT AUTHENTICATION FORM CONTAINER */}
@@ -94,10 +90,11 @@ export default function ForgotPasswordPage() {
           {/* MOBILE LOGO HEADER */}
           <div className="lg:hidden text-center space-y-2 mb-6">
             <Link href="/" className="inline-flex items-center gap-2 group">
-              <Sparkles className="w-5 h-5 text-[#c5a059]" />
-              <span className="font-serif-luxury text-2xl font-bold text-[#f5f4f0]">
-                STUDIO<span className="text-[#c5a059] font-sans text-xs ml-1">AI</span>
-              </span>
+              <img
+                src="/logo-horizontal.png"
+                alt="AI Social Media Studio"
+                className="h-8 w-auto object-contain mx-auto"
+              />
             </Link>
           </div>
 

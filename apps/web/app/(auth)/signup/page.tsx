@@ -174,9 +174,9 @@ export default function SignupPage() {
       <header className="relative z-10 w-full max-w-7xl mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
           <img
-            src="/logo.jpg"
+            src="/logo-horizontal.png"
             alt="AI Social Media Studio"
-            className="h-10 w-auto object-contain rounded-xl border border-white/[0.08] shadow-md shadow-[#D4AF37]/15 group-hover:scale-105 transition-all"
+            className="h-9 md:h-10 w-auto object-contain group-hover:scale-105 transition-all"
           />
         </Link>
 

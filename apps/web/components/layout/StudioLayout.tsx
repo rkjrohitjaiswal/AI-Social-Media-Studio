@@ -109,7 +109,11 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     async function loadUserSession() {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const rawApiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        let apiBase = rawApiBase.replace(/\/+$/, "");
+        if (apiBase.endsWith("/api")) {
+          apiBase = apiBase.substring(0, apiBase.length - 4);
+        }
         const authHeader = await getAuthHeader();
         const res = await fetch(`${apiBase}/api/profile`, {
           headers: { ...authHeader },
@@ -227,19 +231,19 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
               title={collapsed ? "AI Social Media Studio" : undefined}
             >
               {collapsed ? (
-                <div className="w-9 h-9 rounded-xl overflow-hidden border border-[#D4AF37]/40 p-0.5 bg-[#0B0C0E] shadow-md shadow-[#D4AF37]/15 shrink-0 group-hover:scale-105 transition-all">
+                <div className="w-9 h-9 flex items-center justify-center shrink-0 group-hover:scale-105 transition-all">
                   <img
-                    src="/logo-mark.jpg"
+                    src="/logo-mark.png"
                     alt="AI Social Media Studio"
-                    className="w-full h-full object-contain rounded-lg"
+                    className="w-8 h-8 object-contain"
                   />
                 </div>
               ) : (
-                <div className="h-9 flex items-center shrink-0 group-hover:scale-105 transition-all">
+                <div className="h-8 flex items-center shrink-0 group-hover:scale-105 transition-all">
                   <img
-                    src="/logo.jpg"
+                    src="/logo-horizontal.png"
                     alt="AI Social Media Studio"
-                    className="h-9 w-auto object-contain rounded-lg border border-white/[0.08]"
+                    className="h-8 w-auto object-contain"
                   />
                 </div>
               )}

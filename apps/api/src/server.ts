@@ -137,6 +137,11 @@ import { adminRouter } from "./routes/admin.js";
 app.use("/api/admin", adminRouter);
 import { profileRouter } from "./routes/profile.js";
 app.use("/api/profile", profileRouter);
+app.use("/profile", profileRouter);
+app.use("/api/me", profileRouter);
+app.use("/me", profileRouter);
+app.use("/api/user", profileRouter);
+app.use("/user", profileRouter);
 
 
 import { startPublishingWorker } from "./workers/publishing-worker.js";

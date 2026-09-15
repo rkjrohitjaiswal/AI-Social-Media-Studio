@@ -19,6 +19,17 @@ const sansFont = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "AI Social Media Studio — AI Social Media Content Engine",
   description: "Transform 1 reference aesthetic into 100 high-performance social posts with AI visual generation, editorial copy, quality grading, and automated publishing.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({

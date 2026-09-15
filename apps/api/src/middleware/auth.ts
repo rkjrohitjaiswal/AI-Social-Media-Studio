@@ -12,39 +12,88 @@ export interface AuthenticatedRequest extends Request {
   workspaceId?: string;
 }
 
-async function ensureUserExists(id: string, email: string) {
+export async function ensureUserExists(id: string, email: string) {
   try {
-    const user = await prisma.user.upsert({
-      where: { id },
-      update: {},
-      create: {
-        id,
-        email,
-        supabaseUid: id,
-        fullName: "Studio User",
-      },
-      select: { id: true, isAdmin: true },
-    });
+    const cleanEmail = (email || "").trim().toLowerCase();
 
-    // Ensure initial UserUsage record with 10 permanent free credits exists for new user
-    await prisma.userUsage.upsert({
-      where: { userId: id },
-      update: {},
-      create: {
-        userId: id,
-        freeCreditsTotal: 10,
-        freeCreditsUsed: 0,
-        permanentCreditsTotal: 10,
-        permanentCreditsUsed: 0,
-        monthlyCreditsAllowance: 3,
-        monthlyCreditsUsed: 0,
-      },
-    });
+    // 1. Search for existing user record in Prisma DB by id, supabaseUid, or email
+    let user: any = null;
+
+    try {
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id },
+            { supabaseUid: id },
+            ...(cleanEmail ? [{ email: cleanEmail }] : []),
+          ],
+        },
+        select: { id: true, email: true, supabaseUid: true, isAdmin: true },
+      });
+    } catch {
+      // Non-fatal
+    }
+
+    if (!user) {
+      const userEmail = cleanEmail || `${id}@studio.ai`;
+      try {
+        user = await prisma.user.create({
+          data: {
+            id,
+            email: userEmail,
+            supabaseUid: id,
+            fullName: userEmail.split("@")[0] || "Studio User",
+          },
+          select: { id: true, email: true, supabaseUid: true, isAdmin: true },
+        });
+      } catch {
+        // Fallback for offline/mocked DB
+        user = {
+          id,
+          email: userEmail,
+          supabaseUid: id,
+          isAdmin: false,
+        };
+      }
+    }
+
+    if (!user) {
+      user = {
+        id,
+        email: cleanEmail || `${id}@studio.ai`,
+        supabaseUid: id,
+        isAdmin: false,
+      };
+    }
+
+    // 2. Ensure initial UserUsage record exists for credit tracking
+    try {
+      await prisma.userUsage.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: {
+          userId: user.id,
+          freeCreditsTotal: 10,
+          freeCreditsUsed: 0,
+          permanentCreditsTotal: 10,
+          permanentCreditsUsed: 0,
+          monthlyCreditsAllowance: 3,
+          monthlyCreditsUsed: 0,
+        },
+      });
+    } catch {
+      // Non-fatal
+    }
 
     return user;
   } catch {
     // Graceful fallback if database connection or schema is unmigrated in dev
-    return null;
+    return {
+      id,
+      email: (email || "").trim().toLowerCase() || `${id}@studio.ai`,
+      supabaseUid: id,
+      isAdmin: false,
+    };
   }
 }
 
@@ -76,6 +125,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
         isAdmin: true,
       };
       req.workspaceId = resolveWorkspaceId(req);
+      const dbUser = await ensureUserExists(adminSession.userId, adminSession.email);
+      if (dbUser) {
+        req.user.id = dbUser.id;
+      }
+      req.user.isAdmin = true;
       return next();
     }
     // If token starts with adm_ but verification fails -> return 401 directly
@@ -88,7 +142,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     req.user = { id: xUserId.trim(), email: `${xUserId.trim()}@studio.ai` };
     req.workspaceId = resolveWorkspaceId(req);
     const dbUser = await ensureUserExists(req.user.id, req.user.email!);
-    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
+    if (dbUser) {
+      req.user.id = dbUser.id;
+      req.user.isAdmin = dbUser.isAdmin;
+    }
     return next();
   }
 
@@ -97,7 +154,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     req.user = { id: "demo-user-id", email: "demo@maisonlumiere.com" };
     req.workspaceId = resolveWorkspaceId(req);
     const dbUser = await ensureUserExists(req.user.id, req.user.email!);
-    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
+    if (dbUser) {
+      req.user.id = dbUser.id;
+      req.user.isAdmin = dbUser.isAdmin;
+    }
     return next();
   }
 
@@ -116,7 +176,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     };
     req.workspaceId = resolveWorkspaceId(req);
     const dbUser = await ensureUserExists(req.user.id, req.user.email || "user@studio.ai");
-    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
+    if (dbUser) {
+      req.user.id = dbUser.id;
+      req.user.isAdmin = dbUser.isAdmin;
+    }
     next();
   } catch (err) {
     return res.status(401).json({ error: "Unauthorized: Failed to authenticate" });

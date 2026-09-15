@@ -36,8 +36,15 @@ function getActiveWorkspaceId(): string {
 // authenticated user belongs to the requested workspace — this header does NOT
 // bypass ownership or membership checks.
 async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  const url = `${baseUrl}${endpoint}`;
+  const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const baseUrl = rawBaseUrl.replace(/\/+$/, "");
+  let cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  if (baseUrl.endsWith("/api") && cleanEndpoint.startsWith("/api/")) {
+    cleanEndpoint = cleanEndpoint.substring(4);
+  }
+
+  const url = `${baseUrl}${cleanEndpoint}`;
 
   const defaultHeaders = await getAuthHeader();
 
