@@ -128,9 +128,19 @@ YOUTUBE_REDIRECT_URI="http://localhost:3000/api/integrations/youtube/callback"
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Testing**: Vitest (207 unit, integration, and E2E tests)
+- **Testing**: Vitest (688 tests across 64 test files)
 
 ---
+
+## 📚 Documentation
+
+The repository's complete architecture and developer guides are centrally maintained under [`docs/`](file:///c:/Project/AI%20Social%20Media%20Studio/docs/):
+
+- [Master AI Agent Context](file:///c:/Project/AI%20Social%20Media%20Studio/docs/AI_AGENT_CONTEXT.md)
+- [Project Memory & Verified Baseline](file:///c:/Project/AI%20Social%20Media%20Studio/docs/PROJECT_MEMORY.md)
+- [Technical Architecture](file:///c:/Project/AI%20Social%20Media%20Studio/docs/ARCHITECTURE.md)
+- [Changelog](file:///c:/Project/AI%20Social%20Media%20Studio/docs/CHANGELOG.md)
+- [Production Deployment Guide](file:///c:/Project/AI%20Social%20Media%20Studio/DEPLOYMENT.md)
 
 ## ⚡ Quick Start
 

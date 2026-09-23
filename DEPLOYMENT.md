@@ -26,6 +26,8 @@ Copy `.env.example` to `.env` on your deployment server or configure environment
 - `API_URL="https://api.aisocialstudio.com"`
 - `NEXT_PUBLIC_API_URL="https://api.aisocialstudio.com"`
 - `DATABASE_URL="postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres?pgbouncer=true"`
+- `NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT_ID].supabase.co"`
+- `SUPABASE_SERVICE_ROLE_KEY="[your-supabase-private-service-role-key]"` (Mandatory — server exits with error if missing in production)
 - `USER_CREDENTIAL_ENCRYPTION_KEY="[64-character-hex-key]"`
 
 ---

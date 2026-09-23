@@ -6,10 +6,10 @@ export interface StoredUserUsage {
   workspaceId?: string;
   freeCreditsTotal: number;
   freeCreditsUsed: number;
-  permanentCreditsTotal?: number;
-  permanentCreditsUsed?: number;
-  monthlyCreditsAllowance?: number;
-  monthlyCreditsUsed?: number;
+  permanentCreditsTotal: number;
+  permanentCreditsUsed: number;
+  monthlyCreditsAllowance: number;
+  monthlyCreditsUsed: number;
   monthlyCycleStart?: Date;
   lastMonthlyReset?: Date;
   userCreatedAt?: Date;
@@ -194,12 +194,12 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
           userId: dbRecord.userId,
           freeCreditsTotal: dbRecord.freeCreditsTotal,
           freeCreditsUsed: dbRecord.freeCreditsUsed,
-          permanentCreditsTotal: dbRecord.permanentCreditsTotal ?? dbRecord.freeCreditsTotal,
-          permanentCreditsUsed: dbRecord.permanentCreditsUsed ?? dbRecord.freeCreditsUsed,
-          monthlyCreditsAllowance: dbRecord.monthlyCreditsAllowance ?? dbRecord.freeCreditsTotal,
-          monthlyCreditsUsed: dbRecord.monthlyCreditsUsed ?? dbRecord.freeCreditsUsed,
-          monthlyCycleStart: dbRecord.monthlyCycleStart || undefined,
-          lastMonthlyReset: dbRecord.lastMonthlyReset || undefined,
+          permanentCreditsTotal: dbRecord.permanentCreditsTotal,
+          permanentCreditsUsed: dbRecord.permanentCreditsUsed,
+          monthlyCreditsAllowance: dbRecord.monthlyCreditsAllowance,
+          monthlyCreditsUsed: dbRecord.monthlyCreditsUsed,
+          monthlyCycleStart: dbRecord.monthlyCycleStart ?? undefined,
+          lastMonthlyReset: dbRecord.lastMonthlyReset ?? undefined,
           userCreatedAt: dbRecord.user?.createdAt || dbRecord.createdAt,
           createdAt: dbRecord.createdAt,
           updatedAt: dbRecord.updatedAt,

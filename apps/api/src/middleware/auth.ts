@@ -136,9 +136,12 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired admin session token" });
   }
 
-  // 2. Check for x-user-id header (Test / Dev override)
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // 2. Check for x-user-id header (Test / Dev override only)
+  // In production, x-user-id MUST NOT authenticate or override identity.
   const xUserId = req.headers["x-user-id"];
-  if (typeof xUserId === "string" && xUserId.trim().length > 0) {
+  if (!isProduction && typeof xUserId === "string" && xUserId.trim().length > 0) {
     req.user = { id: xUserId.trim(), email: `${xUserId.trim()}@studio.ai` };
     req.workspaceId = resolveWorkspaceId(req);
     const dbUser = await ensureUserExists(req.user.id, req.user.email!);
@@ -149,8 +152,14 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     return next();
   }
 
-  // 3. Default demo workspace context fallback for development/testing if no token present
+  // 3. Unauthenticated request handling
   if (!token) {
+    // In production, missing authentication token MUST receive 401 Unauthorized
+    if (isProduction) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Authentication token required" });
+    }
+
+    // Default demo workspace context fallback for development/testing if no token present
     req.user = { id: "demo-user-id", email: "demo@maisonlumiere.com" };
     req.workspaceId = resolveWorkspaceId(req);
     const dbUser = await ensureUserExists(req.user.id, req.user.email!);
@@ -167,7 +176,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data.user) {
-      return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
+      return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired token" });
     }
 
     req.user = {
@@ -182,7 +191,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     }
     next();
   } catch (err) {
-    return res.status(401).json({ error: "Unauthorized: Failed to authenticate" });
+    return res.status(401).json({ success: false, error: "Unauthorized: Failed to authenticate" });
   }
 }
 
