@@ -22,10 +22,7 @@ const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
  */
 function getAdminSessionSecret(): string {
   return (
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.RAZORPAY_KEY_SECRET ||
-    "ai-social-studio-admin-secret-key-2026"
+    process.env.ADMIN_SESSION_SECRET || ""
   );
 }
 
@@ -71,8 +68,11 @@ export function verifyAdminPassword(password: string, storedSaltAndHash?: string
  * Hashes the password and sets `isAdmin = true` in the database.
  */
 export async function ensureInitialAdminAccount(): Promise<{ email: string; userId: string }> {
-  const adminEmail = (process.env.ADMIN_EMAIL || "admin@studio.ai").trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || "Admin@12345";
+  const adminEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || "";
+  if (!adminEmail || !adminPassword) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be configured"); 
+  }
 
   // Hash password securely (NEVER store plaintext)
   const hashed = hashAdminPassword(adminPassword);
@@ -221,8 +221,12 @@ export async function authenticateAdminCredentials(
   passwordInput: string
 ): Promise<{ success: boolean; session?: AdminUserSession; error?: string }> {
   const email = emailInput.trim().toLowerCase();
-  const envEmail = (process.env.ADMIN_EMAIL || "admin@studio.ai").trim().toLowerCase();
-  const envPassword = process.env.ADMIN_PASSWORD || "Admin@12345";
+  const envEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const envPassword = process.env.ADMIN_PASSWORD || "";
+
+  if (!envEmail || !envPassword || !getAdminSessionSecret()) {
+    return { success: false, error: "Admin authentication is not configured on the server" };
+  }
 
   let isValidPassword = false;
 
