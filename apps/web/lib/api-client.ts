@@ -539,7 +539,7 @@ export async function grantUserSubscription(
   notes?: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const res = await apiFetch(`/api/admin/users/${targetUserId}/subscription`, {
+    const res = await apiFetch(`/api/admin/users/${targetUserId}/grant-subscription`, {
       method: "POST",
       body: JSON.stringify({ plan, durationDays, notes }),
     });
@@ -555,8 +555,8 @@ export async function revokeUserSubscription(
   targetUserId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const res = await apiFetch(`/api/admin/users/${targetUserId}/subscription`, {
-      method: "DELETE",
+    const res = await apiFetch(`/api/admin/users/${targetUserId}/revoke-subscription`, {
+      method: "POST",
     });
     const body = (await res.json() as any);
     if (!res.ok) return { success: false, error: body.error || "Failed to revoke subscription" };

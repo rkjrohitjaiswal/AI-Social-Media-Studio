@@ -254,7 +254,7 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
     const { id: userId } = req.params;
     const { plan = "PRO", durationDays = 30, notes } = req.body || {};
 
-    const validPlans = ["PRO", "ADVANCED", "PREMIUM", "BUSINESS"];
+    const validPlans = ["FREE", "PRO", "ADVANCED", "PREMIUM", "BUSINESS"];
     if (!validPlans.includes(plan.toUpperCase())) {
       return res.status(400).json({ success: false, error: "Invalid subscription plan" });
     }
@@ -264,7 +264,7 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, subscription: true },
+      select: { id: true, email: true, subscription: true, usage: true },
     });
 
     if (!user) {
@@ -273,24 +273,29 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
 
     const previousPlan = user.subscription?.plan || "FREE";
     const now = new Date();
-    const periodEnd = new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);
+    const isFreePlan = selectedPlan === "FREE";
+    const periodEnd = isFreePlan ? now : new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);
 
     const subscription = await prisma.subscription.upsert({
       where: { userId },
       update: {
         plan: selectedPlan,
-        status: "ACTIVE",
-        subscriptionSource: "MANUAL_ADMIN",
+        status: isFreePlan ? "CANCELLED" : "ACTIVE",
+        subscriptionSource: "ADMIN_GRANT",
         currentPeriodStart: now,
+        grantedAt: now,
+        grantedByUserId: req.user?.id || null,
         currentPeriodEnd: periodEnd,
         cancelAtPeriodEnd: false,
       },
       create: {
         userId,
         plan: selectedPlan,
-        status: "ACTIVE",
-        subscriptionSource: "MANUAL_ADMIN",
+        status: isFreePlan ? "CANCELLED" : "ACTIVE",
+        subscriptionSource: "ADMIN_GRANT",
         currentPeriodStart: now,
+        grantedAt: now,
+        grantedByUserId: req.user?.id || null,
         currentPeriodEnd: periodEnd,
         cancelAtPeriodEnd: false,
       },
@@ -298,7 +303,7 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
 
     // Credit allowances by canonical plan registry
     const planDef = SAAS_PLANS_REGISTRY[selectedPlan as SubscriptionPlan] || SAAS_PLANS_REGISTRY.PRO;
-    const newAllowance = planDef.monthlyWorkflows;
+    const newAllowance = isFreePlan ? 3 : planDef.monthlyWorkflows;
 
     const existingUsage = user.usage || (await prisma.userUsage.findUnique({ where: { userId } }));
     const permTotal = existingUsage?.permanentCreditsTotal ?? 0;
@@ -340,7 +345,7 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
           action: "GRANT_SUBSCRIPTION",
           previousPlan,
           newPlan: selectedPlan,
-          subscriptionSource: "MANUAL_ADMIN",
+          subscriptionSource: "ADMIN_GRANT",
           metadataJson: { durationDays: duration, notes: notes || "Granted by admin" },
         },
       });
@@ -370,7 +375,7 @@ adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequ
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, subscription: true },
+      select: { id: true, email: true, subscription: true, usage: true },
     });
 
     if (!user) {
@@ -383,15 +388,15 @@ adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequ
       where: { userId },
       update: {
         plan: "FREE",
-        status: "CANCELED",
-        subscriptionSource: "MANUAL_ADMIN",
+        status: "CANCELLED",
+        subscriptionSource: "ADMIN_GRANT",
         currentPeriodEnd: new Date(),
       },
       create: {
         userId,
         plan: "FREE",
-        status: "CANCELED",
-        subscriptionSource: "MANUAL_ADMIN",
+        status: "CANCELLED",
+        subscriptionSource: "ADMIN_GRANT",
         currentPeriodStart: new Date(),
         currentPeriodEnd: new Date(),
       },
@@ -438,7 +443,7 @@ adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequ
           action: "REVOKE_SUBSCRIPTION",
           previousPlan,
           newPlan: "FREE",
-          subscriptionSource: "MANUAL_ADMIN",
+          subscriptionSource: "ADMIN_GRANT",
           metadataJson: { notes: notes || "Revoked by admin" },
         },
       });
@@ -521,7 +526,7 @@ adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Re
         data: {
           adminUserId: req.user?.id || "system",
           targetUserId: userId,
-          action: "ADJUST_CREDITS",
+          action: "CHANGE_SUBSCRIPTION",
           metadataJson: {
             bonusCredits: additional,
             resetUsage,
@@ -567,12 +572,6 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
           subscriptionSource: true,
           metadataJson: true,
           createdAt: true,
-          adminUser: {
-            select: { email: true, fullName: true },
-          },
-          targetUser: {
-            select: { email: true, fullName: true },
-          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
@@ -583,12 +582,30 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
     const total = typeof totalRaw === "number" ? totalRaw : 0;
     const logs = Array.isArray(logsRaw) ? logsRaw : [];
 
+    const relatedUserIds = Array.from(
+      new Set(
+        logs.flatMap((log: any) => [log.adminUserId, log.targetUserId]).filter(Boolean)
+      )
+    );
+
+    type RelatedUser = { id: string; email: string; fullName: string | null };
+    const relatedUsers: RelatedUser[] = relatedUserIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: relatedUserIds } },
+          select: { id: true, email: true, fullName: true },
+        }).catch(() => [] as RelatedUser[])
+      : [];
+
+    const usersById = new Map<string, RelatedUser>(
+      relatedUsers.map((user) => [user.id, user])
+    );
+
     const formattedLogs = logs.map((l: any) => ({
       id: l.id,
       adminUserId: l.adminUserId,
-      adminEmail: l.adminUser?.email || l.adminUserId,
+      adminEmail: usersById.get(l.adminUserId)?.email || l.adminUserId,
       targetUserId: l.targetUserId,
-      targetEmail: l.targetUser?.email || l.targetUserId,
+      targetEmail: usersById.get(l.targetUserId)?.email || l.targetUserId,
       action: l.action,
       previousPlan: l.previousPlan,
       newPlan: l.newPlan,

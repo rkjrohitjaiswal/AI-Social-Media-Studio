@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
 
   // Grant Subscription Modal State
   const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<"PRO" | "ADVANCED" | "PREMIUM" | "BUSINESS">("PRO");
+  const [selectedPlan, setSelectedPlan] = useState<"FREE" | "PRO" | "ADVANCED" | "PREMIUM" | "BUSINESS">("PRO");
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
   const [adminNotes, setAdminNotes] = useState("");
   const [isSubmittingGrant, setIsSubmittingGrant] = useState(false);
@@ -203,7 +203,7 @@ export default function AdminDashboardPage() {
     if (res.success) {
       setToastMessage({
         type: "success",
-        text: res.message || `Granted ${selectedPlan} subscription to ${selectedUser.email}.`,
+        text: res.message || `${selectedPlan === "FREE" ? "Set" : "Granted"} ${selectedPlan} ${selectedPlan === "FREE" ? "tier for" : "subscription to"} ${selectedUser.email}.`,
       });
       setSelectedUser(null);
       setAdminNotes("");
@@ -817,7 +817,7 @@ export default function AdminDashboardPage() {
                   Select Subscription Plan Tier
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["PRO", "ADVANCED", "PREMIUM", "BUSINESS"] as const).map((p) => (
+                  {(["FREE", "PRO", "ADVANCED", "PREMIUM", "BUSINESS"] as const).map((p) => (
                     <button
                       key={p}
                       type="button"
@@ -830,7 +830,9 @@ export default function AdminDashboardPage() {
                     >
                       <div className="font-bold text-[#D4AF37]">{p}</div>
                       <div className="text-[10px] text-[#9E9D98] mt-0.5">
-                        {p === "PRO"
+                        {p === "FREE"
+                          ? "3 Workflows / mo"
+                          : p === "PRO"
                           ? "50 Workflows / mo"
                           : p === "ADVANCED"
                           ? "150 Workflows / mo"
@@ -899,7 +901,7 @@ export default function AdminDashboardPage() {
                 className="px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B0C0E] text-xs font-bold font-mono flex items-center gap-1.5 disabled:opacity-50"
               >
                 {isSubmittingGrant && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Confirm Grant Plan</span>
+                <span>{selectedPlan === "FREE" ? "Set User to FREE" : "Confirm Grant Plan"}</span>
               </button>
             </div>
           </div>
