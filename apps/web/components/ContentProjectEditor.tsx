@@ -48,6 +48,7 @@ import {
   VoiceoverConfig,
   TextOverlay,
 } from "@ai-social/shared";
+import { apiFetch } from "@/lib/api-client";
 
 interface ContentProjectEditorProps {
   initialProject: ContentProjectDto;
@@ -376,7 +377,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setRegenerating(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/scenes/${selectedScene.id}/regenerate`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/scenes/${selectedScene.id}/regenerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: selectedScene.title }),
@@ -400,7 +401,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setRegenerating(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/scenes/${selectedScene.id}/video/generate`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/scenes/${selectedScene.id}/video/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -441,7 +442,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/save-version`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/save-version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenes, audioState }),
@@ -464,7 +465,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setApproving(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/submit-review`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/submit-review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -491,7 +492,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setGeneratingVoice(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/voiceover`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/voiceover`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -520,7 +521,7 @@ export function ContentProjectEditor({ initialProject, projectId }: ContentProje
     setGeneratingCaptions(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${projectId}/captions`, {
+      const res = await apiFetch(`/api/content-projects/${projectId}/captions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

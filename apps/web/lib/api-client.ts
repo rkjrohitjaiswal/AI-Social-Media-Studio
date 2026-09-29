@@ -14,12 +14,14 @@ import {
   WorkspaceResponse,
   ApprovalRequestResponse,
   NotificationItem,
+  ContentProjectDto,
+  ContentPackageResult,
 } from "@ai-social/shared";
 
 import { createClient } from "./supabase/client";
 
 // Re-export for consumers that import from this file
-export type { NotificationItem };
+export type { NotificationItem, ContentProjectDto, ContentPackageResult };
 
 // Reads the active workspace ID from localStorage (set by StudioContext on switch).
 // Falls back to "demo-workspace-1" for SSR / unauthenticated dev sessions.
@@ -35,7 +37,7 @@ function getActiveWorkspaceId(): string {
 // for the currently active workspace. The backend still enforces that the
 // authenticated user belongs to the requested workspace — this header does NOT
 // bypass ownership or membership checks.
-async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const baseUrl = rawBaseUrl.replace(/\/+$/, "");
   let cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -694,6 +696,16 @@ export async function adminLogin(
     }
     if (typeof window !== "undefined" && body.token) {
       localStorage.setItem("admin_access_token", body.token);
+      // Synchronize HttpOnly server-readable admin session cookie via Next.js Route Handler
+      try {
+        await fetch("/api/auth/admin-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: body.token }),
+        });
+      } catch {
+        // Non-blocking fallback
+      }
     }
     return { success: true, token: body.token, user: body.user };
   } catch (err: unknown) {
@@ -712,8 +724,113 @@ export async function fetchAdminSession(): Promise<{ authenticated: boolean; isA
   }
 }
 
-export function logoutAdmin(): void {
+export async function logoutAdmin(): Promise<void> {
   if (typeof window !== "undefined") {
     localStorage.removeItem("admin_access_token");
+    // Clear Next.js server-readable HttpOnly cookie
+    try {
+      await fetch("/api/auth/admin-session", {
+        method: "DELETE",
+      });
+    } catch {
+      // Non-blocking
+    }
+  }
+  // Clear Express cookie
+  try {
+    await apiFetch("/api/admin/auth/logout", { method: "POST" });
+  } catch {
+    // Non-blocking
+  }
+}
+
+// ==========================================
+// Unified Content Projects API Client
+// ==========================================
+
+export async function fetchContentProjects(): Promise<{ success: boolean; data?: ContentProjectDto[]; error?: string }> {
+  try {
+    const res = await apiFetch("/api/content-projects");
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function fetchContentProject(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}`);
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function createContentProject(payload: {
+  title: string;
+  topic: string;
+  sourceText?: string;
+}): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch("/api/content-projects", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function generateContentPackage(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/generate`, {
+      method: "POST",
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function submitProjectReview(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/submit-review`, {
+      method: "POST",
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function scheduleContentProject(
+  projectId: string,
+  scheduledAt: string,
+  platform = "YOUTUBE"
+): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/schedule`, {
+      method: "POST",
+      body: JSON.stringify({ platform, scheduledAt }),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function restoreProjectVersion(
+  projectId: string,
+  versionId: string
+): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/restore-version`, {
+      method: "POST",
+      body: JSON.stringify({ versionId }),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

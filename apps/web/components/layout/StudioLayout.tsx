@@ -34,7 +34,7 @@ import {
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlobalSearchModal } from "@/components/studio/GlobalSearchModal";
-import { getAuthHeader } from "@/lib/api-client";
+import { getAuthHeader, logoutAdmin } from "@/lib/api-client";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -175,6 +175,11 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   }, []);
 
   const handleSignOut = async () => {
+    try {
+      await logoutAdmin();
+    } catch {
+      // Non-blocking
+    }
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");

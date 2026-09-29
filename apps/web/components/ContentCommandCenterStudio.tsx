@@ -20,6 +20,15 @@ import {
   Edit3,
 } from "lucide-react";
 import { ContentProjectDto, ContentPackageResult } from "@ai-social/shared";
+import {
+  fetchContentProjects,
+  fetchContentProject,
+  createContentProject,
+  generateContentPackage,
+  submitProjectReview,
+  scheduleContentProject,
+  restoreProjectVersion,
+} from "@/lib/api-client";
 
 export function ContentCommandCenterStudio() {
   const [projects, setProjects] = useState<ContentProjectDto[]>([]);
@@ -41,8 +50,7 @@ export function ContentCommandCenterStudio() {
     let ignore = false;
     async function loadProjects() {
       try {
-        const res = await fetch("http://localhost:4000/api/content-projects");
-        const data = await res.json();
+        const data = await fetchContentProjects();
         if (!ignore && data.success && Array.isArray(data.data)) {
           setProjects(data.data);
           if (data.data.length > 0 && !selectedProjectId) {
@@ -59,13 +67,13 @@ export function ContentCommandCenterStudio() {
 
   useEffect(() => {
     if (!selectedProjectId) return;
+    const id = selectedProjectId;
     let ignore = false;
     async function loadDetails() {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:4000/api/content-projects/${selectedProjectId}`);
-        const data = await res.json();
-        if (!ignore && data.success) {
+        const data = await fetchContentProject(id);
+        if (!ignore && data.success && data.data) {
           setCurrentProject(data.data);
         }
       } catch {
@@ -87,18 +95,13 @@ export function ContentCommandCenterStudio() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("http://localhost:4000/api/content-projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle,
-          topic: newTopic,
-          sourceText: newSourceText,
-        }),
+      const data = await createContentProject({
+        title: newTitle,
+        topic: newTopic,
+        sourceText: newSourceText,
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success || !data.data) {
         throw new Error(data.error || "Failed to create project");
       }
 
@@ -106,7 +109,7 @@ export function ContentCommandCenterStudio() {
       setNewTitle("");
       setNewTopic("");
       setNewSourceText("");
-      setProjects((prev) => [data.data, ...prev]);
+      setProjects((prev) => [data.data!, ...prev]);
       setSelectedProjectId(data.data.id);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Project creation failed";
@@ -122,13 +125,9 @@ export function ContentCommandCenterStudio() {
     setGenerating(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${selectedProjectId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const data = await generateContentPackage(selectedProjectId);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success || !data.data) {
         throw new Error(data.error || "Failed to generate package");
       }
 
@@ -145,11 +144,8 @@ export function ContentCommandCenterStudio() {
   const handleSubmitForReview = async () => {
     if (!selectedProjectId) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${selectedProjectId}/submit-review`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (data.success) {
+      const data = await submitProjectReview(selectedProjectId);
+      if (data.success && data.data) {
         setCurrentProject(data.data);
         setNotice("Content project submitted for client review & approval!");
       }
@@ -162,16 +158,8 @@ export function ContentCommandCenterStudio() {
     if (!selectedProjectId) return;
     try {
       const futureDate = new Date(Date.now() + 86400000 * 2).toISOString();
-      const res = await fetch(`http://localhost:4000/api/content-projects/${selectedProjectId}/schedule`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          platform: "YOUTUBE",
-          scheduledAt: futureDate,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const data = await scheduleContentProject(selectedProjectId, futureDate, "YOUTUBE");
+      if (data.success && data.data) {
         setCurrentProject(data.data);
         setNotice("Content project assets scheduled for publishing!");
       }
@@ -183,13 +171,8 @@ export function ContentCommandCenterStudio() {
   const handleRestoreVersion = async (versionId: string) => {
     if (!selectedProjectId) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/content-projects/${selectedProjectId}/restore-version`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionId }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const data = await restoreProjectVersion(selectedProjectId, versionId);
+      if (data.success && data.data) {
         setCurrentProject(data.data);
         setNotice(`Restored version ${versionId}`);
       }

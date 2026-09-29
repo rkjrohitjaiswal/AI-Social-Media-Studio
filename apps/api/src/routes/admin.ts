@@ -72,6 +72,23 @@ adminRouter.get("/auth/me", requireAuth as any, requireAdmin as any, (req: Authe
   });
 });
 
+/**
+ * POST /api/admin/auth/logout
+ * Clears the HTTP-only admin session cookie.
+ */
+adminRouter.post("/auth/logout", (_req: AuthenticatedRequest, res: Response) => {
+  res.clearCookie("admin-access-token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+  return res.json({
+    success: true,
+    message: "Admin logged out successfully",
+  });
+});
+
 // Enforce both session auth and application admin checks across all remaining endpoints in this router
 adminRouter.use(requireAuth as any);
 adminRouter.use(requireAdmin as any);
