@@ -526,7 +526,7 @@ adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Re
         data: {
           adminUserId: req.user?.id || "system",
           targetUserId: userId,
-          action: "ADJUST_CREDITS",
+          action: "CHANGE_SUBSCRIPTION",
           metadataJson: {
             bonusCredits: additional,
             resetUsage,
@@ -572,12 +572,6 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
           subscriptionSource: true,
           metadataJson: true,
           createdAt: true,
-          adminUser: {
-            select: { email: true, fullName: true },
-          },
-          targetUser: {
-            select: { email: true, fullName: true },
-          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
@@ -588,12 +582,29 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
     const total = typeof totalRaw === "number" ? totalRaw : 0;
     const logs = Array.isArray(logsRaw) ? logsRaw : [];
 
+    const relatedUserIds = Array.from(
+      new Set(
+        logs.flatMap((log: any) => [log.adminUserId, log.targetUserId]).filter(Boolean)
+      )
+    );
+
+    const relatedUsers = relatedUserIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: relatedUserIds } },
+          select: { id: true, email: true, fullName: true },
+        }).catch(() => [])
+      : [];
+
+    const usersById = new Map(
+      relatedUsers.map((user: any) => [user.id, user])
+    );
+
     const formattedLogs = logs.map((l: any) => ({
       id: l.id,
       adminUserId: l.adminUserId,
-      adminEmail: l.adminUser?.email || l.adminUserId,
+      adminEmail: usersById.get(l.adminUserId)?.email || l.adminUserId,
       targetUserId: l.targetUserId,
-      targetEmail: l.targetUser?.email || l.targetUserId,
+      targetEmail: usersById.get(l.targetUserId)?.email || l.targetUserId,
       action: l.action,
       previousPlan: l.previousPlan,
       newPlan: l.newPlan,
