@@ -183,6 +183,7 @@ export function verifyAdminSessionToken(token?: string): AdminUserSession | null
     }
 
     const secret = getAdminSessionSecret();
+    if (!secret) return null;
     const expectedSig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
     if (signature.length !== expectedSig.length) {
