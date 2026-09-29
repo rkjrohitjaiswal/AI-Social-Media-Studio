@@ -1,10 +1,12 @@
 import { Router, Response } from "express";
 import prisma from "@ai-social/database";
+import { SAAS_PLANS_REGISTRY, SubscriptionPlan } from "@ai-social/shared";
 import { AuthenticatedRequest, requireAuth, requireAdmin } from "../middleware/auth.js";
 import {
   authenticateAdminCredentials,
   ensureInitialAdminAccount,
 } from "../services/admin-auth-service.js";
+import { invalidateUserUsageCache } from "../services/usage-service.js";
 
 export const adminRouter = Router();
 
@@ -194,8 +196,8 @@ adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
       const sub = u.subscription;
       const usage = u.usage;
       const plan = sub && sub.status === "ACTIVE" ? sub.plan : "FREE";
-      const totalCredits = usage ? (usage.freeCreditsTotal ?? 10) : 10;
-      const usedCredits = usage ? (usage.freeCreditsUsed ?? 0) : 0;
+      const totalCredits = usage ? (usage.freeCreditsTotal ?? ((usage.monthlyCreditsAllowance ?? 10) + (usage.permanentCreditsTotal ?? 0))) : 10;
+      const usedCredits = usage ? (usage.freeCreditsUsed ?? ((usage.monthlyCreditsUsed ?? 0) + (usage.permanentCreditsUsed ?? 0))) : 0;
       const remainingCredits = Math.max(0, totalCredits - usedCredits);
 
       const createdAtStr = u.createdAt
@@ -294,35 +296,40 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
       },
     });
 
-    // Credit allowances by plan
-    const creditMap: Record<string, number> = {
-      PRO: 100,
-      ADVANCED: 250,
-      PREMIUM: 500,
-      BUSINESS: 1000,
-    };
+    // Credit allowances by canonical plan registry
+    const planDef = SAAS_PLANS_REGISTRY[selectedPlan as SubscriptionPlan] || SAAS_PLANS_REGISTRY.PRO;
+    const newAllowance = planDef.monthlyWorkflows;
 
-    const newAllowance = creditMap[selectedPlan] || 100;
+    const existingUsage = user.usage || (await prisma.userUsage.findUnique({ where: { userId } }));
+    const permTotal = existingUsage?.permanentCreditsTotal ?? 0;
+    const permUsed = existingUsage?.permanentCreditsUsed ?? 0;
+    const newFreeTotal = newAllowance + permTotal;
+    const newFreeUsed = permUsed;
+
     await prisma.userUsage.upsert({
       where: { userId },
       update: {
-        freeCreditsTotal: newAllowance,
-        freeCreditsUsed: 0,
         monthlyCreditsAllowance: newAllowance,
         monthlyCreditsUsed: 0,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
         lastMonthlyReset: now,
+        updatedAt: now,
       },
       create: {
         userId,
-        freeCreditsTotal: newAllowance,
-        freeCreditsUsed: 0,
-        permanentCreditsTotal: newAllowance,
-        permanentCreditsUsed: 0,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
+        permanentCreditsTotal: permTotal,
+        permanentCreditsUsed: permUsed,
         monthlyCreditsAllowance: newAllowance,
         monthlyCreditsUsed: 0,
+        monthlyCycleStart: now,
         lastMonthlyReset: now,
       },
     });
+
+    invalidateUserUsageCache(userId);
 
     // Record admin audit log
     try {
@@ -390,24 +397,37 @@ adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequ
       },
     });
 
+    const existingUsage = user.usage || (await prisma.userUsage.findUnique({ where: { userId } }));
+    const permTotal = existingUsage?.permanentCreditsTotal ?? 0;
+    const permUsed = existingUsage?.permanentCreditsUsed ?? 0;
+    const freeAllowance = 3;
+    const freeUsed = Math.min(existingUsage?.monthlyCreditsUsed ?? 0, freeAllowance);
+    const newFreeTotal = freeAllowance + permTotal;
+    const newFreeUsed = freeUsed + permUsed;
+
     await prisma.userUsage.upsert({
       where: { userId },
       update: {
-        freeCreditsTotal: 10,
-        freeCreditsUsed: 0,
-        monthlyCreditsAllowance: 3,
-        monthlyCreditsUsed: 0,
+        monthlyCreditsAllowance: freeAllowance,
+        monthlyCreditsUsed: freeUsed,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
+        updatedAt: new Date(),
       },
       create: {
         userId,
-        freeCreditsTotal: 10,
-        freeCreditsUsed: 0,
-        permanentCreditsTotal: 10,
-        permanentCreditsUsed: 0,
-        monthlyCreditsAllowance: 3,
-        monthlyCreditsUsed: 0,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
+        permanentCreditsTotal: permTotal,
+        permanentCreditsUsed: permUsed,
+        monthlyCreditsAllowance: freeAllowance,
+        monthlyCreditsUsed: freeUsed,
+        monthlyCycleStart: new Date(),
+        lastMonthlyReset: new Date(),
       },
     });
+
+    invalidateUserUsageCache(userId);
 
     // Record admin audit log
     try {
@@ -455,29 +475,45 @@ adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Re
       return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    const currentTotal = user.usage?.freeCreditsTotal ?? 10;
-    const currentUsed = user.usage?.freeCreditsUsed ?? 0;
-    const additional = Math.max(0, parseInt(String(bonusCredits), 10) || 0);
+    const currentUsage = user.usage || (await prisma.userUsage.findUnique({ where: { userId } }));
+    const currentPermTotal = currentUsage?.permanentCreditsTotal ?? 0;
+    const currentPermUsed = currentUsage?.permanentCreditsUsed ?? 0;
+    const currentMonthlyAllowance = currentUsage?.monthlyCreditsAllowance ?? 3;
+    const currentMonthlyUsed = currentUsage?.monthlyCreditsUsed ?? 0;
 
-    const newTotal = currentTotal + additional;
-    const newUsed = resetUsage === true ? 0 : currentUsed;
+    const additional = Math.max(0, parseInt(String(bonusCredits), 10) || 0);
+    const newPermTotal = currentPermTotal + additional;
+    const newMonthlyUsed = resetUsage === true ? 0 : currentMonthlyUsed;
+    const newPermUsed = resetUsage === true ? 0 : currentPermUsed;
+
+    const newFreeTotal = currentMonthlyAllowance + newPermTotal;
+    const newFreeUsed = newMonthlyUsed + newPermUsed;
+    const now = new Date();
 
     const usage = await prisma.userUsage.upsert({
       where: { userId },
       update: {
-        freeCreditsTotal: newTotal,
-        freeCreditsUsed: newUsed,
+        permanentCreditsTotal: newPermTotal,
+        permanentCreditsUsed: newPermUsed,
+        monthlyCreditsUsed: newMonthlyUsed,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
+        updatedAt: now,
       },
       create: {
         userId,
-        freeCreditsTotal: newTotal,
-        freeCreditsUsed: newUsed,
-        permanentCreditsTotal: newTotal,
-        permanentCreditsUsed: newUsed,
-        monthlyCreditsAllowance: 3,
-        monthlyCreditsUsed: 0,
+        freeCreditsTotal: newFreeTotal,
+        freeCreditsUsed: newFreeUsed,
+        permanentCreditsTotal: newPermTotal,
+        permanentCreditsUsed: newPermUsed,
+        monthlyCreditsAllowance: currentMonthlyAllowance,
+        monthlyCreditsUsed: newMonthlyUsed,
+        monthlyCycleStart: now,
+        lastMonthlyReset: now,
       },
     });
+
+    invalidateUserUsageCache(userId);
 
     // Record admin audit log
     try {
@@ -489,8 +525,7 @@ adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Re
           metadataJson: {
             bonusCredits: additional,
             resetUsage,
-            newTotal,
-            newUsed,
+            permanentCreditsTotal: newPermTotal,
             notes: notes || "Credit adjustment by admin",
           },
         },
@@ -501,7 +536,7 @@ adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Re
 
     return res.json({
       success: true,
-      message: `Successfully updated credits for ${user.email}`,
+      message: `Successfully added ${additional} permanent credits for ${user.email}`,
       usage,
     });
   } catch (err: unknown) {

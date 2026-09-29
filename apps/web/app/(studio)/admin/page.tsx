@@ -835,8 +835,8 @@ export default function AdminDashboardPage() {
                           : p === "ADVANCED"
                           ? "150 Workflows / mo"
                           : p === "PREMIUM"
-                          ? "400 Workflows / mo"
-                          : "1,000 Workflows / mo"}
+                          ? "300 Workflows / mo"
+                          : "500 Workflows / mo"}
                       </div>
                     </button>
                   ))}
@@ -913,7 +913,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <h3 className="text-base font-bold text-[#F5F4F0] flex items-center gap-2">
                 <Zap className="w-4 h-4 text-[#D4AF37]" />
-                <span>Adjust User Credits</span>
+                <span>Adjust User Permanent Credits</span>
               </h3>
               <button onClick={() => setCreditUser(null)} className="text-[#9E9D98] hover:text-white">
                 <X className="w-5 h-5" />
@@ -935,11 +935,14 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-4 text-xs font-mono">
-              {/* Add Bonus Credits */}
+              {/* Add Permanent Bonus Credits */}
               <div>
-                <label className="block text-[10px] text-[#9E9D98] uppercase mb-1.5 font-bold">
-                  Bonus Credits to Add
+                <label className="block text-[10px] text-[#9E9D98] uppercase mb-0.5 font-bold">
+                  Permanent Bonus Credits to Add
                 </label>
+                <p className="text-[10px] text-[#9E9D98] mb-2 font-sans">
+                  Granted credits are added to the user&apos;s permanent pool and never expire during monthly resets.
+                </p>
                 <div className="grid grid-cols-4 gap-2 mb-2">
                   {[5, 10, 25, 50].map((amt) => (
                     <button

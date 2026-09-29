@@ -42,7 +42,7 @@ export function UsageWidget() {
 
   const limit = usage.monthlyLimit ?? 10;
   const used = usage.usedCredits ?? 0;
-  const remaining = usage.remainingCredits ?? Math.max(0, limit - used);
+  const remaining = usage.totalRemainingCredits ?? usage.remainingCredits ?? Math.max(0, limit - used);
   const isExhausted = remaining <= 0;
   const progressPercent = Math.min(100, Math.round((used / limit) * 100));
 
@@ -70,6 +70,9 @@ export function UsageWidget() {
       <div className="flex items-center justify-between text-[11px] text-[#9e9d98]">
         <span>
           Used: <strong className="text-[#f5f4f0]">{used}</strong> | Remaining: <strong className="text-[#f5f4f0]">{remaining}</strong>
+          {usage.permanentRemainingCredits && usage.permanentRemainingCredits > 0 ? (
+            <span className="text-[#c5a059] ml-1">({usage.permanentRemainingCredits} perm)</span>
+          ) : null}
         </span>
         {isExhausted ? (
           <span className="text-red-400 font-bold">Credits Exhausted — Upgrade Plan</span>

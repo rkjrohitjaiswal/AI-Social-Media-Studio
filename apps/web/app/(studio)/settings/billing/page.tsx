@@ -80,8 +80,8 @@ export default function BillingSettingsPage() {
   };
 
   const totalRemaining = billingStatus?.totalRemainingCredits ?? billingStatus?.workflowsRemaining ?? 0;
-  const permRemaining = billingStatus?.permanentRemainingCredits ?? billingStatus?.workflowsRemaining ?? 0;
-  const permTotal = billingStatus?.permanentTotalCredits ?? 10;
+  const permRemaining = billingStatus?.permanentRemainingCredits ?? 0;
+  const permTotal = billingStatus?.permanentTotalCredits ?? 0;
   const monthlyRemaining = billingStatus?.monthlyRemainingCredits ?? 0;
   const monthlyAllowance = billingStatus?.monthlyAllowance ?? (billingStatus?.plan === "FREE" ? 3 : billingStatus?.monthlyWorkflowsLimit ?? 0);
 
@@ -189,10 +189,12 @@ export default function BillingSettingsPage() {
               <Sparkles className="w-4 h-4 fill-[#c5a059]" />
             </div>
             <div className="text-2xl font-bold font-mono text-[#f5f4f0]">
-              {billingStatus?.workflowsRemaining ?? 0} <span className="text-xs font-normal text-[#9e9d98]">available</span>
+              {totalRemaining} <span className="text-xs font-normal text-[#9e9d98]">available</span>
             </div>
             <div className="text-[11px] text-[#9e9d98]">
-              {billingStatus?.nextMonthlyResetDate
+              {permRemaining > 0
+                ? `${monthlyRemaining} monthly + ${permRemaining} permanent`
+                : billingStatus?.nextMonthlyResetDate
                 ? `Resets on ${new Date(billingStatus.nextMonthlyResetDate).toLocaleDateString()}`
                 : "Resets every monthly cycle"}
             </div>

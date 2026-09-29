@@ -16,24 +16,33 @@ usageRouter.get("/", async (req: AuthenticatedRequest, res: Response) => {
     const plan = await getUserPlan(targetId);
     const usage = await getUserUsage(targetId);
 
-    const now = new Date();
-    const nextResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-
     return res.json({
       success: true,
       data: {
         plan,
-        monthlyLimit: usage.freeCreditsTotal,
-        usedCredits: usage.freeCreditsUsed,
-        remainingCredits: usage.freeCreditsRemaining,
+        // Monthly pool
+        monthlyLimit: usage.monthlyCreditsAllowance,
+        monthlyAllowance: usage.monthlyCreditsAllowance,
+        monthlyUsedCredits: usage.monthlyCreditsUsed,
+        monthlyRemainingCredits: usage.monthlyCreditsRemaining,
+
+        // Permanent pool
+        permanentTotalCredits: usage.permanentCreditsTotal,
+        permanentUsedCredits: usage.permanentCreditsUsed,
+        permanentRemainingCredits: usage.permanentCreditsRemaining,
+
+        // Total aggregates
+        totalRemainingCredits: usage.totalRemainingCredits,
+        remainingCredits: usage.totalRemainingCredits,
+        usedCredits: usage.usedCredits,
+
+        // Legacy compatibility mirrors
+        freeCreditsTotal: usage.freeCreditsTotal,
+        freeCreditsUsed: usage.freeCreditsUsed,
+        freeCreditsRemaining: usage.freeCreditsRemaining,
+
+        // Cycle metadata
         resetPeriod: usage.nextMonthlyResetDate,
-        totalRemainingCredits: usage.freeCreditsRemaining,
-        permanentRemainingCredits: usage.freeCreditsRemaining,
-        permanentTotalCredits: usage.freeCreditsTotal,
-        permanentUsedCredits: usage.freeCreditsUsed,
-        monthlyRemainingCredits: usage.freeCreditsRemaining,
-        monthlyAllowance: usage.freeCreditsTotal,
-        monthlyUsedCredits: usage.freeCreditsUsed,
         nextMonthlyResetDate: usage.nextMonthlyResetDate,
         isInitialMonth: usage.isInitialMonth,
         cycleIndex: usage.cycleIndex,

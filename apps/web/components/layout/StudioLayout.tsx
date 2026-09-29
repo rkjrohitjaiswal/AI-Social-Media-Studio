@@ -641,23 +641,27 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             ) : (
               <Link
                 href="/settings/billing"
-                title={`${usage?.remainingCredits ?? 0} / ${usage?.monthlyLimit ?? 10} Credits Available (${
-                  usage?.isInitialMonth ? "First Month: 10 Credits Total" : "Monthly Cycle: 3 Credits/Month"
+                title={`${usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0} Credits Available (${
+                  usage?.permanentRemainingCredits && usage.permanentRemainingCredits > 0
+                    ? `${usage?.monthlyRemainingCredits ?? 0} monthly + ${usage.permanentRemainingCredits} permanent`
+                    : usage?.isInitialMonth
+                    ? "First Month: 10 Credits Total"
+                    : "Monthly Cycle: 3 Credits/Month"
                 }). Click to manage subscription.`}
                 className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer z-10 ${
-                  (usage?.remainingCredits ?? 0) <= 0
+                  (usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0) <= 0
                     ? "bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20"
-                    : (usage?.remainingCredits ?? 0) <= 2
+                    : (usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0) <= 2
                     ? "bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
                     : "bg-[#0B0C0E] border-white/[0.08] text-[#F5F4F0] hover:border-[#D4AF37]/40 hover:text-[#D4AF37]"
                 }`}
               >
-                <Zap className={`w-3.5 h-3.5 shrink-0 ${(usage?.remainingCredits ?? 0) <= 0 ? "text-red-400 fill-red-400" : "text-[#D4AF37] fill-[#D4AF37]"}`} />
+                <Zap className={`w-3.5 h-3.5 shrink-0 ${(usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0) <= 0 ? "text-red-400 fill-red-400" : "text-[#D4AF37] fill-[#D4AF37]"}`} />
                 <span className="font-semibold inline-block">
-                  {usage?.remainingCredits ?? 0} / {usage?.monthlyLimit ?? 10}
+                  {usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0} / {usage?.monthlyLimit ?? 10}
                   <span className="hidden sm:inline text-[#9E9D98] ml-1 font-normal">credits</span>
                 </span>
-                {(usage?.remainingCredits ?? 0) <= 0 && (
+                {(usage?.totalRemainingCredits ?? usage?.remainingCredits ?? 0) <= 0 && (
                   <span className="ml-1 text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
                     Upgrade
                   </span>

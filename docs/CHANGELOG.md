@@ -26,6 +26,20 @@ This file is the chronological record of all significant changes made to the **A
 
 ## Change Log
 
+### 2026-09-29 — Phase 8C: Credit Lifecycle Dual-Pool Correction
+
+| Field | Detail |
+| :--- | :--- |
+| **Change** | Implemented true dual-pool credit ledger system separating non-expiring permanent credits (`permanentCreditsTotal`/`permanentCreditsUsed`) from cycle-resetting monthly credits (`monthlyCreditsAllowance`/`monthlyCreditsUsed`). Refactored `usage-service.ts`, `usage.ts`, `admin.ts`, and `subscription-service.ts`. Provision new FREE users with 10 monthly / 0 permanent credits for Month 1, and 3 monthly credits for Month 2+. Admin credit grants now increase permanent credits without touching monthly allowance or resetting monthly cycle. Fixed concurrency race condition by resolving canonical user identity before lock acquisition and writing transactional atomic increments. Aligned admin and frontend allowance displays with canonical `SAAS_PLANS_REGISTRY`. Added 20 automated credit lifecycle tests. |
+| **Reason** | The Phase 8C Audit (`docs/archive/PHASE_8C_CREDIT_LIFECYCLE_AUDIT_2026-09-28.md`) identified that the application still operated on a broken single-balance model (`freeCreditsTotal`), where new users received 10 permanent credits, admin grants overwrote monthly allowances, monthly resets wiped out admin grants, and concurrent consumption had lock-key discrepancies. |
+| **Affected Files** | `apps/api/src/services/usage-service.ts` (dual-pool ledger, monthly-first consumption, canonical identity resolution, cache invalidation)<br>`apps/api/src/routes/usage.ts` (distinct monthly/permanent/total metric serialization)<br>`apps/api/src/routes/admin.ts` (admin grants target permanent pool, canonical plan allowances, cache invalidation)<br>`apps/api/src/services/subscription-service.ts` (dual-pool metrics and preservation across plan changes)<br>`apps/api/src/middleware/auth.ts` (provision new users with 10 monthly / 0 permanent)<br>`apps/web/app/(studio)/admin/page.tsx` (plan tiers aligned with canonical registry, permanent credit modal)<br>`apps/web/app/(studio)/settings/billing/page.tsx` (dual-pool remaining credit display)<br>`apps/web/components/UsageWidget.tsx` (dual-pool credit breakdown)<br>`apps/web/components/layout/StudioLayout.tsx` (dual-pool badge & tooltip)<br>`tests/free-credit-system.test.ts` (20 comprehensive credit lifecycle tests)<br>`docs/archive/PHASE_8C_CREDIT_LIFECYCLE_CORRECTION_2026-09-29.md` (full implementation report) |
+| **Behavior Impact** | Monthly credits expire at cycle boundary and do not roll over. Permanent credits never expire and survive monthly resets and subscription changes. Monthly credits are always consumed before permanent credits. API endpoints and UI display explicit monthly and permanent breakdown. |
+| **Verification** | `npx vitest run tests/free-credit-system.test.ts`: **20 passed (100%)**.<br>`npx vitest run`: **64 test files, 700 tests passed (100%)**.<br>`npm run typecheck`: **all 4 workspaces passed (0 errors)**.<br>`npx prisma migrate status`: **Database schema is up to date (0 migrations pending)**. |
+| **Commit / Reference** | Pending commit. Implementation report: `docs/archive/PHASE_8C_CREDIT_LIFECYCLE_CORRECTION_2026-09-29.md`. |
+| **Result** | Credit lifecycle fully corrected to dual-pool specification. Concurrency hardened. Full test suite passing with zero regressions. |
+
+---
+
 ### 2026-09-23 — Phase 8B: Prisma Schema Alignment
 
 | Field | Detail |

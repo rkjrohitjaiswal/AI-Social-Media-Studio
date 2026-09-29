@@ -75,10 +75,12 @@ export async function ensureUserExists(id: string, email: string) {
           userId: user.id,
           freeCreditsTotal: 10,
           freeCreditsUsed: 0,
-          permanentCreditsTotal: 10,
+          permanentCreditsTotal: 0,
           permanentCreditsUsed: 0,
-          monthlyCreditsAllowance: 3,
+          monthlyCreditsAllowance: 10,
           monthlyCreditsUsed: 0,
+          monthlyCycleStart: new Date(),
+          lastMonthlyReset: new Date(),
         },
       });
     } catch {
