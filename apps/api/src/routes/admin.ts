@@ -588,15 +588,16 @@ adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) 
       )
     );
 
-    const relatedUsers = relatedUserIds.length
+    type RelatedUser = { id: string; email: string; fullName: string | null };
+    const relatedUsers: RelatedUser[] = relatedUserIds.length
       ? await prisma.user.findMany({
           where: { id: { in: relatedUserIds } },
           select: { id: true, email: true, fullName: true },
-        }).catch(() => [])
+        }).catch(() => [] as RelatedUser[])
       : [];
 
-    const usersById = new Map(
-      relatedUsers.map((user: any) => [user.id, user])
+    const usersById = new Map<string, RelatedUser>(
+      relatedUsers.map((user) => [user.id, user])
     );
 
     const formattedLogs = logs.map((l: any) => ({
