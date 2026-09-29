@@ -543,9 +543,23 @@ export async function grantUserSubscription(
       method: "POST",
       body: JSON.stringify({ plan, durationDays, notes }),
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to grant subscription" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to grant subscription" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Subscription granted successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -558,9 +572,23 @@ export async function revokeUserSubscription(
     const res = await apiFetch(`/api/admin/users/${targetUserId}/revoke-subscription`, {
       method: "POST",
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to revoke subscription" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to revoke subscription" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Subscription revoked successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -577,9 +605,23 @@ export async function adjustUserCredits(
       method: "POST",
       body: JSON.stringify({ bonusCredits, resetUsage, notes }),
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to adjust credits" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to adjust credits" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Credits updated successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
