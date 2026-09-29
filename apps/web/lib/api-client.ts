@@ -14,12 +14,14 @@ import {
   WorkspaceResponse,
   ApprovalRequestResponse,
   NotificationItem,
+  ContentProjectDto,
+  ContentPackageResult,
 } from "@ai-social/shared";
 
 import { createClient } from "./supabase/client";
 
 // Re-export for consumers that import from this file
-export type { NotificationItem };
+export type { NotificationItem, ContentProjectDto, ContentPackageResult };
 
 // Reads the active workspace ID from localStorage (set by StudioContext on switch).
 // Falls back to "demo-workspace-1" for SSR / unauthenticated dev sessions.
@@ -30,12 +32,26 @@ function getActiveWorkspaceId(): string {
   return "demo-workspace-1";
 }
 
+/**
+ * Synchronize the admin-access-token cookie from localStorage to document.cookie.
+ * This guarantees Next.js edge middleware can always read the admin session
+ * on server-rendered and client-navigated routes.
+ */
+export function syncAdminSessionCookie(): void {
+  if (typeof window === "undefined") return;
+  const adminToken = localStorage.getItem("admin_access_token");
+  if (adminToken && adminToken.startsWith("adm_")) {
+    const isHttps = window.location.protocol === "https:";
+    document.cookie = `admin-access-token=${adminToken}; path=/; max-age=604800; SameSite=Lax${isHttps ? "; Secure" : ""}`;
+  }
+}
+
 // Base API fetch wrapper with cookie credentials.
 // Automatically attaches x-workspace-id so the backend can validate membership
 // for the currently active workspace. The backend still enforces that the
 // authenticated user belongs to the requested workspace — this header does NOT
 // bypass ownership or membership checks.
-async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const baseUrl = rawBaseUrl.replace(/\/+$/, "");
   let cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -295,6 +311,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
   };
 
   if (typeof window !== "undefined") {
+    syncAdminSessionCookie();
     const adminToken = localStorage.getItem("admin_access_token");
     if (adminToken) {
       headers["Authorization"] = `Bearer ${adminToken}`;
@@ -543,9 +560,23 @@ export async function grantUserSubscription(
       method: "POST",
       body: JSON.stringify({ plan, durationDays, notes }),
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to grant subscription" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to grant subscription" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Subscription granted successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -558,9 +589,23 @@ export async function revokeUserSubscription(
     const res = await apiFetch(`/api/admin/users/${targetUserId}/revoke-subscription`, {
       method: "POST",
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to revoke subscription" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to revoke subscription" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Subscription revoked successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -577,9 +622,23 @@ export async function adjustUserCredits(
       method: "POST",
       body: JSON.stringify({ bonusCredits, resetUsage, notes }),
     });
-    const body = (await res.json() as any);
-    if (!res.ok) return { success: false, error: body.error || "Failed to adjust credits" };
-    return { success: true, message: body.message };
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = (await res.json() as any);
+      if (!res.ok) return { success: false, error: body?.error || body?.message || "Failed to adjust credits" };
+      return { success: true, message: body?.message };
+    }
+
+    // Gracefully handle non-JSON responses (HTML 404/500 from proxy, gateway, or fallback)
+    await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `Server returned ${res.status} (${res.statusText || "Error"}). Please check API connection.`,
+      };
+    }
+    return { success: true, message: "Credits updated successfully" };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -652,6 +711,17 @@ export async function adminLogin(
     }
     if (typeof window !== "undefined" && body.token) {
       localStorage.setItem("admin_access_token", body.token);
+      syncAdminSessionCookie();
+      // Synchronize HttpOnly server-readable admin session cookie via Next.js Route Handler
+      try {
+        await fetch("/api/auth/admin-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: body.token }),
+        });
+      } catch {
+        // Non-blocking fallback
+      }
     }
     return { success: true, token: body.token, user: body.user };
   } catch (err: unknown) {
@@ -661,6 +731,7 @@ export async function adminLogin(
 
 export async function fetchAdminSession(): Promise<{ authenticated: boolean; isAdmin: boolean; user?: any }> {
   try {
+    syncAdminSessionCookie();
     const res = await apiFetch("/api/admin/auth/me");
     if (!res.ok) return { authenticated: false, isAdmin: false };
     const body = (await res.json() as any);
@@ -670,8 +741,114 @@ export async function fetchAdminSession(): Promise<{ authenticated: boolean; isA
   }
 }
 
-export function logoutAdmin(): void {
+export async function logoutAdmin(): Promise<void> {
   if (typeof window !== "undefined") {
     localStorage.removeItem("admin_access_token");
+    document.cookie = "admin-access-token=; path=/; max-age=0; SameSite=Lax";
+    // Clear Next.js server-readable HttpOnly cookie
+    try {
+      await fetch("/api/auth/admin-session", {
+        method: "DELETE",
+      });
+    } catch {
+      // Non-blocking
+    }
+  }
+  // Clear Express cookie
+  try {
+    await apiFetch("/api/admin/auth/logout", { method: "POST" });
+  } catch {
+    // Non-blocking
+  }
+}
+
+// ==========================================
+// Unified Content Projects API Client
+// ==========================================
+
+export async function fetchContentProjects(): Promise<{ success: boolean; data?: ContentProjectDto[]; error?: string }> {
+  try {
+    const res = await apiFetch("/api/content-projects");
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function fetchContentProject(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}`);
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function createContentProject(payload: {
+  title: string;
+  topic: string;
+  sourceText?: string;
+}): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch("/api/content-projects", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function generateContentPackage(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/generate`, {
+      method: "POST",
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function submitProjectReview(projectId: string): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/submit-review`, {
+      method: "POST",
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function scheduleContentProject(
+  projectId: string,
+  scheduledAt: string,
+  platform = "YOUTUBE"
+): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/schedule`, {
+      method: "POST",
+      body: JSON.stringify({ platform, scheduledAt }),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function restoreProjectVersion(
+  projectId: string,
+  versionId: string
+): Promise<{ success: boolean; data?: ContentProjectDto; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/content-projects/${projectId}/restore-version`, {
+      method: "POST",
+      body: JSON.stringify({ versionId }),
+    });
+    return (await res.json()) as any;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

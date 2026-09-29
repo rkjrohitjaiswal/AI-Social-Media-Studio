@@ -143,6 +143,44 @@ app.use("/me", profileRouter);
 app.use("/api/user", profileRouter);
 app.use("/user", profileRouter);
 
+// Fallback 404 handler for unmatched API routes
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `API route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global error handler for API and server errors
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = typeof err?.status === "number" && err.status >= 400 && err.status < 600
+    ? err.status
+    : typeof err?.statusCode === "number" && err.statusCode >= 400 && err.statusCode < 600
+    ? err.statusCode
+    : 500;
+
+  // Handle malformed JSON body from express.json()
+  if (err instanceof SyntaxError && "body" in err) {
+    return res.status(400).json({
+      success: false,
+      error: "Malformed JSON payload",
+    });
+  }
+
+  // Return clean JSON error without exposing sensitive internals in production
+  const isProduction = process.env.NODE_ENV === "production";
+  const errorMessage = isProduction
+    ? status >= 500
+      ? "Internal server error"
+      : err?.message || "Request failed"
+    : err?.message || "Internal server error";
+
+  return res.status(status).json({
+    success: false,
+    error: errorMessage,
+  });
+});
+
 
 import { startPublishingWorker } from "./workers/publishing-worker.js";
 
