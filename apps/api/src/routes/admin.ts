@@ -264,7 +264,7 @@ adminRouter.post("/users/:id/grant-subscription", async (req: AuthenticatedReque
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, subscription: true },
+      select: { id: true, email: true, subscription: true, usage: true },
     });
 
     if (!user) {
@@ -375,7 +375,7 @@ adminRouter.post("/users/:id/revoke-subscription", async (req: AuthenticatedRequ
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, subscription: true },
+      select: { id: true, email: true, subscription: true, usage: true },
     });
 
     if (!user) {
