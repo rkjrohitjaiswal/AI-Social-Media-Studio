@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days session grace period
 
 function isValidAdminSession(token?: string): boolean {
   if (!token || typeof token !== "string" || !token.startsWith("adm_")) return false;
@@ -18,8 +18,10 @@ function isValidAdminSession(token?: string): boolean {
     const payloadParts = payload.split(":");
     if (payloadParts.length < 3) return false;
 
-    const timestamp = parseInt(payloadParts[2], 10);
-    if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_TTL_MS || timestamp > Date.now() + 60000) {
+    // Last segment is the timestamp
+    const timestamp = parseInt(payloadParts[payloadParts.length - 1], 10);
+    // Allow up to 7 days age, and up to 1 hour forward clock drift between server and edge
+    if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_TTL_MS || timestamp > Date.now() + 3600000) {
       return false;
     }
     return true;

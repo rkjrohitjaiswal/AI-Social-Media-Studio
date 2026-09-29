@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function validateAdminTokenFormat(token?: string): boolean {
   if (!token || typeof token !== "string" || !token.startsWith("adm_")) return false;
@@ -18,8 +18,9 @@ function validateAdminTokenFormat(token?: string): boolean {
     const payloadParts = payload.split(":");
     if (payloadParts.length < 3) return false;
 
-    const timestamp = parseInt(payloadParts[2], 10);
-    if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_TTL_MS || timestamp > Date.now() + 60000) {
+    const timestampStr = payloadParts[payloadParts.length - 1];
+    const timestamp = parseInt(timestampStr, 10);
+    if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_TTL_MS || timestamp > Date.now() + 3600000) {
       return false;
     }
     return true;
@@ -42,11 +43,11 @@ export async function POST(request: NextRequest) {
 
     const cookieStore = await cookies();
     cookieStore.set("admin-access-token", token, {
-      httpOnly: true,
+      httpOnly: false, // Accessible by client and server for seamless sync
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 24 * 60 * 60, // 24 hours in seconds
+      maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
     });
 
     return NextResponse.json({ success: true });

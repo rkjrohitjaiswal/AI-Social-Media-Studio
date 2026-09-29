@@ -32,6 +32,20 @@ function getActiveWorkspaceId(): string {
   return "demo-workspace-1";
 }
 
+/**
+ * Synchronize the admin-access-token cookie from localStorage to document.cookie.
+ * This guarantees Next.js edge middleware can always read the admin session
+ * on server-rendered and client-navigated routes.
+ */
+export function syncAdminSessionCookie(): void {
+  if (typeof window === "undefined") return;
+  const adminToken = localStorage.getItem("admin_access_token");
+  if (adminToken && adminToken.startsWith("adm_")) {
+    const isHttps = window.location.protocol === "https:";
+    document.cookie = `admin-access-token=${adminToken}; path=/; max-age=604800; SameSite=Lax${isHttps ? "; Secure" : ""}`;
+  }
+}
+
 // Base API fetch wrapper with cookie credentials.
 // Automatically attaches x-workspace-id so the backend can validate membership
 // for the currently active workspace. The backend still enforces that the
@@ -297,6 +311,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
   };
 
   if (typeof window !== "undefined") {
+    syncAdminSessionCookie();
     const adminToken = localStorage.getItem("admin_access_token");
     if (adminToken) {
       headers["Authorization"] = `Bearer ${adminToken}`;
@@ -696,6 +711,7 @@ export async function adminLogin(
     }
     if (typeof window !== "undefined" && body.token) {
       localStorage.setItem("admin_access_token", body.token);
+      syncAdminSessionCookie();
       // Synchronize HttpOnly server-readable admin session cookie via Next.js Route Handler
       try {
         await fetch("/api/auth/admin-session", {
@@ -715,6 +731,7 @@ export async function adminLogin(
 
 export async function fetchAdminSession(): Promise<{ authenticated: boolean; isAdmin: boolean; user?: any }> {
   try {
+    syncAdminSessionCookie();
     const res = await apiFetch("/api/admin/auth/me");
     if (!res.ok) return { authenticated: false, isAdmin: false };
     const body = (await res.json() as any);
@@ -727,6 +744,7 @@ export async function fetchAdminSession(): Promise<{ authenticated: boolean; isA
 export async function logoutAdmin(): Promise<void> {
   if (typeof window !== "undefined") {
     localStorage.removeItem("admin_access_token");
+    document.cookie = "admin-access-token=; path=/; max-age=0; SameSite=Lax";
     // Clear Next.js server-readable HttpOnly cookie
     try {
       await fetch("/api/auth/admin-session", {

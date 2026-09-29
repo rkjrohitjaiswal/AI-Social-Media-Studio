@@ -34,7 +34,7 @@ import {
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlobalSearchModal } from "@/components/studio/GlobalSearchModal";
-import { getAuthHeader, logoutAdmin } from "@/lib/api-client";
+import { getAuthHeader, logoutAdmin, syncAdminSessionCookie } from "@/lib/api-client";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -88,6 +88,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   const badgeLabel = unreadCount > 99 ? "99+" : unreadCount.toString();
 
   useEffect(() => {
+    syncAdminSessionCookie();
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("sidebar_collapsed");
       if (saved === "true") {
@@ -232,6 +233,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           >
             <Link
               href="/dashboard"
+              onClick={() => syncAdminSessionCookie()}
               className="flex items-center gap-3 group"
               title={collapsed ? "AI Social Media Studio" : undefined}
             >
@@ -335,7 +337,10 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           {/* PRIMARY CTA: + CREATE */}
           <Link
             href="/create"
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={() => {
+              syncAdminSessionCookie();
+              setIsMobileMenuOpen(false);
+            }}
             title={collapsed ? "Create Content" : undefined}
             className={`w-full py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-[#0B0C0E] font-semibold text-xs shadow-md shadow-[#D4AF37]/10 hover:opacity-95 transition-all flex items-center justify-center gap-2 shrink-0 ${
               collapsed ? "px-0" : "px-4"
@@ -366,7 +371,10 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                       key={item.name}
                       href={item.href}
                       title={collapsed ? item.name : undefined}
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={() => {
+                        syncAdminSessionCookie();
+                        setIsMobileMenuOpen(false);
+                      }}
                       className={`flex items-center rounded-xl text-xs font-medium transition-all group ${
                         collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
                       } ${
