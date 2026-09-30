@@ -1,4 +1,19 @@
 import prisma from "@ai-social/database";
+
+// Helper to determine if a user is an admin (has unlimited credits)
+async function isAdminUser(userId: string): Promise<boolean> {
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+    return !!dbUser?.isAdmin;
+  } catch {
+    // If DB lookup fails, treat as non-admin (fails safe)
+    return false;
+  }
+}
+
 import { getUserPlan, getPlanEntitlements } from "./entitlement-service.js";
 
 export interface StoredUserUsage {
@@ -407,6 +422,14 @@ export async function checkUsageAccess(
   isPro: boolean;
 }> {
   const userId = await resolveCanonicalUserId(userIdOrWorkspaceId);
+  // Admin users have unlimited credits; bypass all checks
+  if (await isAdminUser(userId)) {
+    return {
+      allowed: true,
+      freeCreditsRemaining: Number.MAX_SAFE_INTEGER,
+      isPro: true,
+    };
+  }
   const plan = await getUserPlan(userId);
   const usage = await getUserUsage(userId);
   const isPaid = plan !== "FREE";
@@ -450,6 +473,16 @@ export async function consumeUsage(
   cost: number = 1
 ): Promise<{ freeCreditsTotal: number; freeCreditsUsed: number; freeCreditsRemaining: number }> {
   const canonicalUserId = await resolveCanonicalUserId(userIdOrWorkspaceId);
+
+  // Admin users have unlimited credits; bypass consumption logic
+  if (await isAdminUser(canonicalUserId)) {
+    const usage = await getUserUsage(canonicalUserId);
+    return {
+      freeCreditsTotal: usage.freeCreditsTotal,
+      freeCreditsUsed: usage.freeCreditsUsed,
+      freeCreditsRemaining: usage.freeCreditsRemaining,
+    };
+  }
 
   return withLock(canonicalUserId, async () => {
     const userId = canonicalUserId;

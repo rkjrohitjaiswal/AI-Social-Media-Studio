@@ -229,6 +229,7 @@ describe("Phase 8A — Production Authentication Hardening Test Suite", () => {
   it("8. preserves stateless admin adm_ session token verification", async () => {
     process.env.ADMIN_EMAIL = "admin@studio.ai";
     process.env.ADMIN_PASSWORD = "StrongAdminPassword@2026";
+    process.env.ADMIN_SESSION_SECRET = 'test_admin_secret';
     clearInMemoryAdminState();
     await ensureInitialAdminAccount();
 

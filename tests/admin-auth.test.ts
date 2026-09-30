@@ -16,6 +16,7 @@ describe("Production Admin Authentication, Profile & Route Alias Test Suite", ()
   beforeEach(async () => {
     process.env.ADMIN_EMAIL = testAdminEmail;
     process.env.ADMIN_PASSWORD = testAdminPassword;
+    process.env.ADMIN_SESSION_SECRET = 'test_admin_secret';
     clearInMemoryAdminState();
     await ensureInitialAdminAccount();
   });
