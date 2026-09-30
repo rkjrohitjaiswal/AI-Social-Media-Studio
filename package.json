@@ -10,7 +10,7 @@
     "dev": "npm run dev --workspace=@ai-social/web",
     "dev:web": "npm run dev --workspace=@ai-social/web",
     "dev:api": "npm run dev --workspace=@ai-social/api",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present && node -e \"const fs=require('fs'); fs.rmSync('./.next', {recursive:true, force:true}); fs.cpSync('./apps/web/.next', './.next', {recursive:true});\"",
     "build:web": "npm run build --workspace=@ai-social/web",
     "build:api": "npm run build --workspace=@ai-social/api",
     "lint": "npm run lint --workspaces --if-present",
